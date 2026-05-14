@@ -1,0 +1,51 @@
+"use client"
+
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+import React, { use } from 'react'
+import { UserButton } from '@clerk/nextjs'
+import { Layers2 } from 'lucide-react'
+
+// cette composant est utilisé pour afficher la barre de navigation dans l'application. Il utilise le hook usePathname pour obtenir le chemin actuel de l'URL et déterminer quel lien de navigation est actif. Les liens de navigation sont définis dans un tableau navlinks, et la fonction renderlinks est utilisée pour générer les éléments de lien avec les classes CSS appropriées en fonction de leur état actif ou non.
+const Navbar = () => {
+    const pathname=usePathname()
+    const navlinks=[
+        {
+        href:'/',
+        label:'Factures'}
+    ]
+
+    const  isActiveLink=(href:string)=>pathname.replace(/\/$/,'')===href.replace(/\/$/,'');
+
+const renderlinks=(classNames:string)=>
+     navlinks.map(({href,label})=>{
+        return  <Link href={href} key={href} className={
+            `btn-sm  ${classNames} ${isActiveLink(href)? "btn-accent":""}`
+        }>{label}</Link>
+    })
+
+  return (
+    <div className='border-b  border-base-300 px-5 md:px-[10%] py-4 relative'>
+        <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-2'>
+                <div className='bg-accent-content text-accent rounded-full p-2 '>
+             <Layers2 className='w-6 h-6'/>
+            
+            </div>
+              <span className='ml-3 font-bold text-2xl italic'>
+                In<span className='text-accent'>voice</span>
+             </span>
+            </div>
+            <div className='flex items-center space-x-4'>
+                {renderlinks("btn")}
+                {/* c'est le compasant qui vient du cleark pour la deconnexion  */}
+                <UserButton/>
+            </div>
+        </div>
+        <div></div>
+
+    </div>
+  )
+}
+
+export default Navbar
