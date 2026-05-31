@@ -2,18 +2,29 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import React, { use } from 'react'
-import { UserButton } from '@clerk/nextjs'
+import  { useEffect } from 'react'
+import { UserButton, useUser } from '@clerk/nextjs'
 import { Layers2 } from 'lucide-react'
+import { checkAndAddUser } from '../actions'
 
 // cette composant est utilisé pour afficher la barre de navigation dans l'application. Il utilise le hook usePathname pour obtenir le chemin actuel de l'URL et déterminer quel lien de navigation est actif. Les liens de navigation sont définis dans un tableau navlinks, et la fonction renderlinks est utilisée pour générer les éléments de lien avec les classes CSS appropriées en fonction de leur état actif ou non.
 const Navbar = () => {
     const pathname=usePathname()
+    //pour recuperer les informations des utilisateurs 
+    const {user}=useUser()
+    
     const navlinks=[
         {
         href:'/',
         label:'Factures'}
     ]
+    //pour mettre a jour le composant chaque fois que les informations de l'utilisateur changent, par exemple après la connexion ou la déconnexion affiche avant que la page charge.
+    useEffect(()=>{
+    if(user?.primaryEmailAddress?.emailAddress && user?.fullName){
+        //on appelle à la fonction checkAndAddUser pour vérifier si l'utilisateur existe déjà dans la base de données et l'ajouter si ce n'est pas le cas.
+        checkAndAddUser(user.primaryEmailAddress.emailAddress, user.fullName)
+    }
+    },[user])
 
     const  isActiveLink=(href:string)=>pathname.replace(/\/$/,'')===href.replace(/\/$/,'');
 
