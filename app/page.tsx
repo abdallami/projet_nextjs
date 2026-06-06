@@ -90,7 +90,8 @@ const fetchInvoices = async()=>{
           Invoices.length>0 && (
             Invoices.map((invoice,index)=>(
               <div key={index}>
-                <InvoiceComponents />
+               
+                <InvoiceComponents  invoice={invoice} index={index} />
                 <p>{invoice.name}</p>
               </div>
             ))
