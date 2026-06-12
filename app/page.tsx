@@ -49,7 +49,7 @@ export default function Home() {
   };
   //pour afficher les factures
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 const [Invoices,setInvoices] = useState<Invoice[]>([]);
 const fetchInvoices = async()=>{
     try{
@@ -63,8 +63,9 @@ const fetchInvoices = async()=>{
   } 
   
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchInvoices()
+    if (email) {
+      fetchInvoices()
+    }
   }, [email])
  
   
@@ -92,7 +93,7 @@ const fetchInvoices = async()=>{
               <div key={index}>
                
                 <InvoiceComponents  invoice={invoice} index={index} />
-                <p>{invoice.name}</p>
+                
               </div>
             ))
           )}

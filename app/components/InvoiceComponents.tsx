@@ -58,6 +58,25 @@ const getstatusBage=(status: number)=>{
 }
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const InvoiceComponents: React.FC<InvoiceComponentsProps> = ({ invoice,index}) => {
+//calculer la totale 
+  const calculetotal = () => {
+    const totalHT=invoice?.lines?.reduce((acc,lines)=>{
+      const quantity =lines.quantity??0;
+      const unitprice= lines.unitPrice??0;
+      return acc+quantity*unitprice
+
+       },0)
+    const TotalVAT= totalHT*(invoice.vatRate/100);
+    return totalHT+TotalVAT
+
+    
+
+  }
+
+
+
+
+
   return (
     <div className='bg-base-200/90 rouded-xl p-5 space-y-3 shadow '>
        <div className='flex justify-between items-center w-full'>
@@ -69,8 +88,26 @@ const InvoiceComponents: React.FC<InvoiceComponentsProps> = ({ invoice,index}) =
         href={`/invoice/${invoice.id}`}>
         View 
          <SquareArrowOutUpRight
-         className="w-4 "/>
+         className='w-4 '/>
         </Link>
+       </div>
+       <div className='w-full'>
+        <div className="">
+          <div   className='stat-title'>
+            <div className='upercase text-sm '>
+              FAct-{invoice.id}
+            </div>
+          </div>
+          <div>
+           <div className='stat-value'>
+            {calculetotal().toFixed(2)} Fr
+           </div>
+          </div>
+          <div className='stat-desc'>
+            {invoice.name}
+
+          </div>
+        </div>
        </div>
       
     </div>
