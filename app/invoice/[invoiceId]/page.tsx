@@ -4,7 +4,7 @@ import Invoiceinfo from '@/app/components/Invoiceinfo'
 import InvoiceLines from '@/app/components/InvoiceLines'
 import VATcontrole from '@/app/components/VATcontrole'
 import Wrapper from '@/app/components/Wrapper'
-import { Invoice } from '@/type'
+import { Invoice, Totals } from '@/type'
 import { Trash } from 'lucide-react'
 import { useEffect, useState } from 'react'
 const Page = ({params}:{params:Promise<{invoiceId:string}>}) => {
@@ -14,6 +14,8 @@ const Page = ({params}:{params:Promise<{invoiceId:string}>}) => {
  
  const[initialinvoice ,setInitialInvoice]= useState<Invoice | null>(null);
  
+ const [totals,setTotals]=useState<Totals|null>(null)
+
  /*useEffect(()=>{
    const fetchInvoice = async () => {
      try {
@@ -73,11 +75,26 @@ const Page = ({params}:{params:Promise<{invoiceId:string}>}) => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchInvoice()
   }, [])
-  if(!invoice) return(
+ 
+  useEffect(() => {
+    if(!invoice) return;
+    const ht =invoice.lines.reduce((acc,{quantity,unitPrice})=>
+      acc+quantity*unitPrice,0
+    )
+    const vat =invoice.vatActive ? ht*(invoice.vatRate/100):0
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTotals({totalHT: ht,  totalVAT : vat, totalTTC: ht+vat})
+   
+  }, [invoice])
+   if(!invoice || !totals) return(
     < div className='flex justify-center items-center h-screen w-full'>
       <span className='font-bold'>facture Non trouve</span>
     </div>
   )
+
+
+
+
 
    return (
      <Wrapper>
@@ -113,6 +130,10 @@ const Page = ({params}:{params:Promise<{invoiceId:string}>}) => {
               Resume des tataux
               <VATcontrole invoice={invoice} setInvoice={setInvoice}/>
             </div>
+          </div>
+          <div>
+            <span>TVA({invoice?.vatRate}%)</span>
+            <span></span>
           </div>
            
          </div>

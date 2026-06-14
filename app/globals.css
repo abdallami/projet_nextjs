@@ -2,3 +2,9 @@
 @plugin "daisyui" {
   themes: light --default, dark --prefersdark, cupcake;
 }
+.scrollable{
+  overflow:auto;
+  max-height: 100vh;
+
+
+}
