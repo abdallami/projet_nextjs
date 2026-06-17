@@ -35,7 +35,7 @@ const InvoiceLines :React.FC<Props> = ({invoice,setInvoice}) => {
     }
      const handleunitprixchange=(index:number,value:string)=>{
         const updatedlines=[...invoice.lines]
-        updatedlines[index].unitPrice=value===""?0:parseInt(value)
+        updatedlines[index].unitPrice=value===""?0:parseFloat(value)
         setInvoice({...invoice,lines:updatedlines})
     }
     const handleREmoveline=(index:number)=>{
@@ -46,8 +46,8 @@ const InvoiceLines :React.FC<Props> = ({invoice,setInvoice}) => {
   return (
     <div className='h-fit bg-base-200 rounded-xl w-full p-5'>
         <div className='flex justify-between items-center mb-4'>
-            <h2 className='bage bage-accent '>produits /services</h2>
-            <button  className='btn btn-sm btn-accent'
+            <h2 className='badge badge-accent'>Produits / Services</h2>
+            <button  className='btn btn-sm btn-accent flex justify-center items-center'
             onClick={handleAddline}>
                 <Plus className='w-4'/>
             </button>
@@ -56,11 +56,11 @@ const InvoiceLines :React.FC<Props> = ({invoice,setInvoice}) => {
                 <table className='table w-full'>
                     <thead className='uppercase'>
                         <tr>
-                            <th>Quantite</th>
+                            <th>Quantité</th>
                             <th>Description</th>
-                            <th>prix unitaire(HT)</th>
-                            <th>Montant(HT)</th>
-                            <th></th>
+                            <th>Prix unitaire (HT)</th>
+                            <th>Montant (HT)</th>
+                            <th>Action</th>
                         </tr>
                         
                     </thead>
@@ -87,14 +87,14 @@ const InvoiceLines :React.FC<Props> = ({invoice,setInvoice}) => {
                                   onChange={(e)=> handleunitprixchange(index,e.target.value)}
                                 />
                                </td>
-                               <td className='font-bold'>
-                                 {(line.quantity*line.unitPrice).toFixed(2)}frc
+                               <td className='font-bold text-right'>
+                                 {(line.quantity*line.unitPrice).toFixed(2)} Frc
                                  
                                </td>
                                <td>
-                                <button className='btn btn-sm btn-circle btn-accent'>
-                                    <Trash className='w-4'
-                                    onClick={()=>handleREmoveline(index)}/>
+                                <button className='btn btn-sm btn-circle btn-accent flex justify-center items-center'
+                                onClick={()=>handleREmoveline(index)}>
+                                    <Trash className='w-4'/>
                                 </button>
                                </td>
                                

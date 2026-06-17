@@ -24,20 +24,17 @@ const VATcontrole :React.FC<Props> = ({invoice,setInvoice}) =>{
     }
   return (
    
-    <div className='flex items-center '>
-      <label className='block text-sm font-bold'>TV(%)</label>
+    <div className='flex items-center gap-3 flex-wrap'>
+      <label className='block text-sm font-semibold'>TVA (%)</label>
       <input type="checkbox" name="" id=""
-      onChange={handalVatchange} className='toggle toggle-sm ml-2
-      'checked={invoice.vatActive}/>
+      onChange={handalVatchange} className='toggle toggle-sm'
+      checked={invoice.vatActive}/>
       {invoice.vatActive &&(
         <input type="number" name="" id="" value={invoice.vatRate}
-        className='input input-sm input-bordered w-16 ml-2'
+        className='input input-sm input-bordered w-20'
         onChange={handalVatRatechange}
         min={0}/>
-      )
-
-      }
-
+      )}
     </div>
   )
   

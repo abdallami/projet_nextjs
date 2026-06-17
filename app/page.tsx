@@ -73,13 +73,16 @@ const fetchInvoices = async()=>{
 
   return (
     <Wrapper> 
-      <div className="flex flex-col space-y-4">
-        <h1 className="text-lg font-bold">Mes factures</h1>
+      <div className="flex flex-col space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">Mes factures</h1>
+          <p className="text-sm text-gray-500">Gérez vos factures facilement et efficacement</p>
+        </div>
       
-      <div className="grid md:grid-cols-3 gap-4">
-       <div className="cursor-pointer border border-accent rounded-xl  flex flex-col  justify-center items-center p-5"
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+       <div className="cursor-pointer border border-accent rounded-xl flex flex-col justify-center items-center p-5 hover:bg-accent hover:bg-opacity-10 transition-all duration-200"
         onClick={()=>(document.getElementById('my_modal_3')as HTMLDialogElement).showModal()}>
-        <div className="text-acent font-bold">
+        <div className="text-accent font-bold text-center">
           créer une facture
         </div>
           <div className='bg-accent-content text-accent rounded-full p-2 mt-2'>
@@ -98,22 +101,22 @@ const fetchInvoices = async()=>{
             ))
           )}
       </div>
-      <dialog id="my_modal_3" className="modal">
-        <div className="modal-box">
+      <dialog id="my_modal_3" className="modal modal-middle">
+        <div className="modal-box w-full sm:max-w-md">
           <form method="dialog">
             <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
           </form>
-          <h3 className="font-bold text-lg">Nouvelle facture</h3>
-        <input type="text"  value={invoiceName} onChange={(e)=>setInvoiceName(e.target.value)} placeholder="Nom de la facture (max 60 caractères)" 
-        className="input input-bordered w-full my-4 hover:borber-none outline-none rounded-2xl border-accent "/>
+          <h3 className="font-bold text-lg mb-4">Nouvelle facture</h3>
+          <div className="space-y-4">
+            <input type="text" value={invoiceName} onChange={(e)=>setInvoiceName(e.target.value)} placeholder="Nom de la facture (max 60 caractères)" 
+            className="input input-bordered w-full outline-none focus:border-accent focus:ring-2 focus:ring-accent"/>
 
-        {!isNamevalid && (
-          <p className="mb-4 text-sm text-red-500">Le nom de la facture dépasse 60 caractères.</p>
-        )}
-        <button className="btn btn-accent" disabled={ !isNamevalid || invoiceName.length === 0 }
-        onClick={handleCreateInvoice}>Créer</button>
-       
-      
+            {!isNamevalid && (
+              <p className="text-sm text-error">Le nom de la facture dépasse 60 caractères.</p>
+            )}
+            <button className="btn btn-accent w-full" disabled={ !isNamevalid || invoiceName.length === 0 }
+            onClick={handleCreateInvoice}>Créer</button>
+          </div>
         </div>
       </dialog>
 

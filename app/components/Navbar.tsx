@@ -31,7 +31,7 @@ const Navbar = () => {
 const renderlinks=(classNames:string)=>
      navlinks.map(({href,label})=>{
         return  <Link href={href} key={href} className={
-            `btn-sm  ${classNames} ${isActiveLink(href)? "btn-accent":""}`
+            `btn-sm ${classNames} ${isActiveLink(href)? "btn-accent":""} flex justify-center items-center`
         }>{label}</Link>
     })
 
@@ -39,21 +39,18 @@ const renderlinks=(classNames:string)=>
     <div className='border-b  border-base-300 px-5 md:px-[10%] py-4 relative'>
         <div className='flex items-center justify-between'>
             <div className='flex items-center gap-2'>
-                <div className='bg-accent-content text-accent rounded-full p-2 '>
-             <Layers2 className='w-6 h-6'/>
-            
+                <div className='bg-accent-content text-accent rounded-full p-2'>
+                   <Layers2 className='w-5 h-5 md:w-6 md:h-6'/>
+                </div>
+                <span className='font-bold text-lg md:text-2xl italic'>
+                   In<span className='text-accent'>voice</span>
+                </span>
             </div>
-              <span className='ml-3 font-bold text-2xl italic'>
-                In<span className='text-accent'>voice</span>
-             </span>
-            </div>
-            <div className='flex items-center space-x-4'>
+            <div className='flex items-center gap-3'>
                 {renderlinks("btn")}
-                {/* c'est le compasant qui vient du cleark pour la deconnexion  */}
                 <UserButton/>
             </div>
         </div>
-        <div></div>
 
     </div>
   )

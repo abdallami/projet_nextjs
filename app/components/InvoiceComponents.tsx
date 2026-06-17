@@ -78,17 +78,16 @@ const InvoiceComponents: React.FC<InvoiceComponentsProps> = ({ invoice,index}) =
 
 
   return (
-    <div className='bg-base-200/90 rouded-xl p-5 space-y-3 shadow '>
-       <div className='flex justify-between items-center w-full'>
+          <div className='bg-base-200/90 rounded-xl p-5 space-y-3 shadow hover:shadow-lg transition-shadow'>
+       <div className='flex justify-between items-center w-full flex-wrap gap-2'>
         <div>
           {getstatusBage(invoice.status)}
         </div>
         <Link 
-        className='btn btn-accent btn-sm'
+        className='btn btn-accent btn-sm flex justify-center items-center'
         href={`/invoice/${invoice.id}`}>
-        View 
-         <SquareArrowOutUpRight
-         className='w-4 '/>
+        <SquareArrowOutUpRight className='w-4'/>
+         <span className='ml-2'>Voir</span>
         </Link>
        </div>
        <div className='w-full'>
