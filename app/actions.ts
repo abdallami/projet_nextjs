@@ -2,7 +2,6 @@
 //c'est le metier logique de notre application, c'est ici que nous allons faire les appels à la base de données pour vérifier si l'utilisateur existe déjà ou pas, et s'il n'existe pas, on va le créer.
 import { prisma } from "@/lib/prisma";
 import { Invoice } from "@/type";
-import { error } from "console";
 import { randomBytes } from "crypto";
 //la fonction qui nous permet de vérifier si l'utilisateur existe déjà ou pas, et s'il n'existe pas, on va le créer.
 export async function checkAndAddUser(email: string, name: string) {
@@ -148,78 +147,104 @@ export async function getInvoiceById(invoiceId:string){
 }
 
 //pour modifier  les facture existantes
-export async function updateInvoice(invoice:Invoice){
-    try{
-         const existingInvoice = await prisma.invoice.findUnique({
-            where:{id:invoice.id},
-            include:{
-                lines:true
-            }
-        })
-        if(!existingInvoice){
-            throw new Error(`Facture avec l 'ID  ${invoice.id}introuvable`);
-        }
-        await prisma.invoice.update({
-             where:{id:invoice.id},
-             data:{
-                issuerName:invoice.issuerName,
-                issuerAddress:invoice.issuerAddress,
-                clientName:invoice.clientName,
-                clientAddress:invoice.clientAddress,
-                invoiceDate:invoice.invoiceDate,
-                dueDate:invoice.dueDate,
-                vatActive:invoice.vatActive,
-                vatRate:invoice.vatRate,
-                status:invoice.status
-             },
-        })
-        const existinglines =existingInvoice.lines
-        const receivedlines = invoice.lines
-        const linesToDetete=existinglines.filter(
-            (existingline)=>!receivedlines.some((line)=>line.id===existingline.id)
-        )
-       if(linesToDetete.length >0){
-        await prisma.invoiceLine.deleteMany({
-            where:{
-                id:{
-                    in:linesToDetete.map((line)=>line.id)
-                }
-            }
-        })
-       }
-       for(const line of receivedlines){
-        const existingline=existinglines.find((l)=>l.id==line.id)
-        if(existingline){
-            const  hasChanged=
-                line.description !== existingline.description ||
-                line.quantity!== existingline.quantity ||
-                line.unitPrice !== existingline.unitPrice ;
-                if( hasChanged){
-                    await prisma.invoiceLine.update({
-                        where:{id:line.id},
-                        data:{
-                            description:line.description,
-                            quantity:line.quantity,
-                            unitPrice:line.unitPrice
+export async function updateInvoice(invoice: Invoice) {
+  try {
+    const existingInvoice = await prisma.invoice.findUnique({
+      where: { id: invoice.id },
+      include: { lines: true }
+    })
 
-                        }
-                    })
-                } 
-        } else{
-                    //creer une nouvelle ligne
-                    await prisma.invoiceLine.create({
-                        data:{
-                           description:line.description,
-                            quantity:line.quantity,
-                            unitPrice:line.unitPrice,
-                            invoiceId:invoice.id
-                        }
-                    })
-                }
-       }
-    }catch(error){
-        console.error(error)
+    if (!existingInvoice) {
+      throw new Error(`Facture avec l'ID ${invoice.id} introuvable`)
     }
+
+    // Mettre à jour la facture
+    await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        issuerName: invoice.issuerName,
+        issuerAddress: invoice.issuerAddress,
+        clientName: invoice.clientName,
+        clientAddress: invoice.clientAddress,
+        invoiceDate: invoice.invoiceDate,
+        dueDate: invoice.dueDate,
+        vatActive: invoice.vatActive,
+        vatRate: invoice.vatRate,
+        status: invoice.status
+      },
+    })
+
+    // Gérer les lignes
+    const existingLines = existingInvoice.lines
+    const receivedLines = invoice.lines
+
+    // Supprimer les lignes retirées
+    const linesToDelete = existingLines.filter(
+      (existingLine) => !receivedLines.some((line) => line.id === existingLine.id)
+    )
+    if (linesToDelete.length > 0) {
+      await prisma.invoiceLine.deleteMany({
+        where: { id: { in: linesToDelete.map((line) => line.id) } }
+      })
+    }
+
+    // Mettre à jour ou créer les lignes
+    for (const line of receivedLines) {
+      const existingLine = existingLines.find((l) => l.id === line.id)
+      if (existingLine) {
+        const hasChanged =
+          line.description !== existingLine.description ||
+          line.quantity !== existingLine.quantity ||
+          line.unitPrice !== existingLine.unitPrice ||
+          line.productId !== existingLine.productId
+        if (hasChanged) {
+          await prisma.invoiceLine.update({
+            where: { id: line.id },
+            data: {
+              description: line.description,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              productId: line.productId ?? null,
+            }
+          })
+        }
+      } else {
+        await prisma.invoiceLine.create({
+          data: {
+            description: line.description,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            invoiceId: invoice.id,
+            productId: line.productId ?? null,
+          }
+        })
+      }
+    }
+
+    // ✅ Décrémenter le stock si la facture passe à "Payé" (status = 3)
+    const wasAlreadyPaid = existingInvoice.status === 3
+    const isNowPaid = invoice.status === 3
+
+    if (isNowPaid && !wasAlreadyPaid) {
+      for (const line of receivedLines) {
+        if (line.productId) {
+          const product = await prisma.product.findUnique({
+            where: { id: line.productId }
+          })
+          if (product) {
+            const newQty = product.quantity - line.quantity
+            await prisma.product.update({
+              where: { id: line.productId },
+              data: { quantity: newQty < 0 ? 0 : newQty }
+            })
+          }
+        }
+      }
+    }
+
+  } catch (error) {
+    console.error(error)
+  }
 }
 //pour supprimer
 export async function deleteInvoice(invoiceId:string){
@@ -233,4 +258,178 @@ export async function deleteInvoice(invoiceId:string){
  }catch(error){
    console.error(error)
  }
+}
+
+// pour les categorie et produits 
+// ============================================
+// CATÉGORIES
+// ============================================
+
+export async function getCategories(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return [];
+    return await prisma.category.findMany({
+      where: { userId: user.id },
+      include: { products: true },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+}
+
+export async function createCategory(
+  email: string,
+  name: string,
+  description: string
+) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw new Error("Utilisateur introuvable");
+    return await prisma.category.create({
+      data: { name, description, userId: user.id },
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function updateCategory(
+  id: string,
+  name: string,
+  description: string
+) {
+  try {
+    return await prisma.category.update({
+      where: { id },
+      data: { name, description },
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function deleteCategory(id: string) {
+  try {
+    // Détache les produits liés avant de supprimer
+    await prisma.product.updateMany({
+      where: { categoryId: id },
+      data: { categoryId: null },
+    });
+    return await prisma.category.delete({ where: { id } });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// ============================================
+// PRODUITS
+// ============================================
+
+export async function getProducts(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return [];
+    return await prisma.product.findMany({
+      where: { userId: user.id },
+      include: { category: true },
+      orderBy: { updatedAt: "desc" },
+    });
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+}
+
+export async function createProduct(
+  email: string,
+  data: {
+    name: string;
+    description: string;
+    price: number;
+    quantity: number;
+    alertQty: number;
+    categoryId?: string;
+  }
+) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw new Error("Utilisateur introuvable");
+    return await prisma.product.create({
+      data: { ...data, userId: user.id },
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function updateProduct(
+  id: string,
+  data: {
+    name: string;
+    description: string;
+    price: number;
+    quantity: number;
+    alertQty: number;
+    categoryId?: string | null;
+  }
+) {
+  try {
+    return await prisma.product.update({
+      where: { id },
+      data,
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function deleteProduct(id: string) {
+  try {
+    return await prisma.product.delete({ where: { id } });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// ============================================
+// STOCK — décrémente quand une facture est validée
+// ============================================
+
+export async function decrementStock(
+  productId: string,
+  quantity: number
+) {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    });
+    if (!product) throw new Error("Produit introuvable");
+
+    const newQty = product.quantity - quantity;
+    return await prisma.product.update({
+      where: { id: productId },
+      data: { quantity: newQty < 0 ? 0 : newQty },
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Produits avec stock faible (en dessous du seuil alertQty)
+export async function getLowStockProducts(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return [];
+    const products = await prisma.product.findMany({
+      where: { userId: user.id },
+      include: { category: true },
+    });
+    return products.filter((p) => p.quantity <= p.alertQty);
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 }

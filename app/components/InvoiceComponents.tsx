@@ -59,19 +59,13 @@ const getstatusBage=(status: number)=>{
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const InvoiceComponents: React.FC<InvoiceComponentsProps> = ({ invoice,index}) => {
 //calculer la totale 
-  const calculetotal = () => {
-    const totalHT=invoice?.lines?.reduce((acc,lines)=>{
-      const quantity =lines.quantity??0;
-      const unitprice= lines.unitPrice??0;
-      return acc+quantity*unitprice
-
-       },0)
-    const TotalVAT= totalHT*(invoice.vatRate/100);
-    return totalHT+TotalVAT
-
-    
-
-  }
+ const calculetotal = () => {
+  const totalHT = invoice?.lines?.reduce((acc, line) => {
+    return acc + (line.quantity ?? 0) * (line.unitPrice ?? 0)
+  }, 0)
+  const totalVAT = invoice.vatActive ? totalHT * (invoice.vatRate / 100) : 0
+  return totalHT + totalVAT
+}
 
 
 
@@ -99,7 +93,7 @@ const InvoiceComponents: React.FC<InvoiceComponentsProps> = ({ invoice,index}) =
           </div>
           <div>
            <div className='stat-value'>
-            {calculetotal().toFixed(2)} Fr
+             {calculetotal().toLocaleString()} FCFA
            </div>
           </div>
           <div className='stat-desc'>

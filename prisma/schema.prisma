@@ -11,7 +11,7 @@ datasource db {
  
 }
 
-model User {
+/*model User {
   id       String    @id @default(uuid())
   name     String
   email    String    @unique
@@ -42,4 +42,66 @@ model InvoiceLine {
   unitPrice   Float    @default(0)
   invoiceId   String?
   invoice     Invoice? @relation("InvoiceLines", fields: [invoiceId], references: [id], onDelete: Cascade)
+}*/
+model User {
+  id         String     @id @default(uuid())
+  name       String
+  email      String     @unique
+  invoices   Invoice[]  @relation("UserInvoices")
+  products   Product[]  @relation("UserProducts")
+  categories Category[] @relation("UserCategories")
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  description String    @default("")
+  userId      String
+  createdBy   User      @relation("UserCategories", fields: [userId], references: [id])
+  products    Product[] @relation("CategoryProducts")
+  createdAt   DateTime  @default(now())
+}
+
+model Product {
+  id           String        @id @default(uuid())
+  name         String
+  description  String        @default("")
+  price        Float         @default(0)
+  quantity     Int           @default(0)
+  alertQty     Int           @default(5)   // alerte stock faible
+  categoryId   String?
+  category     Category?     @relation("CategoryProducts", fields: [categoryId], references: [id])
+  userId       String
+  createdBy    User          @relation("UserProducts", fields: [userId], references: [id])
+  invoiceLines InvoiceLine[] @relation("ProductLines")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Invoice {
+  id            String        @id
+  name          String
+  issuerName    String        @default("")
+  issuerAddress String        @default("")
+  clientName    String        @default("")
+  clientAddress String        @default("")
+  invoiceDate   String        @default("")
+  dueDate       String        @default("")
+  vatActive     Boolean       @default(false)
+  vatRate       Float         @default(20)
+  status        Int           @default(1)
+  lines         InvoiceLine[] @relation("InvoiceLines")
+  userId        String
+  createdById   User          @relation("UserInvoices", fields: [userId], references: [id])
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid())
+  description String   @default("")
+  quantity    Int      @default(0)
+  unitPrice   Float    @default(0)
+  invoiceId   String?
+  invoice     Invoice? @relation("InvoiceLines", fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation("ProductLines", fields: [productId], references: [id])
 }
