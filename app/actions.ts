@@ -3,8 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { Invoice } from "@/type";
 import { randomBytes } from "crypto";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyInvoice = any
+
 //la fonction qui nous permet de vérifier si l'utilisateur existe déjà ou pas, et s'il n'existe pas, on va le créer.
 export async function checkAndAddUser(email: string, name: string) {
     if (!email) return;
