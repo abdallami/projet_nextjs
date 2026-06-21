@@ -103,23 +103,25 @@ export async function getInvoicesByEmail(email: string) {
         // 5: Impayé
         if (user) {
             const today = new Date()
-            const updatedInvoices = await Promise.all(
-                user.invoices.map(async (invoice: Invoice) => {
-                    const dueDate = new Date(invoice.dueDate)
-                    if (
-                        dueDate < today &&
-                        invoice.status == 2
-                    ) {
-                        const updatedInvoice = await prisma.invoice.update({
-                            where: { id: invoice.id },
-                            data: { status: 5 },
-                            include: { lines: true }
-                        })
-                        return updatedInvoice
-                    }
-                    return invoice
-                })
-            )
+           // ✅ Après
+   const updatedInvoices = await Promise.all(
+    user.invoices.map(async (invoice) => {
+        const invoiceTyped = invoice as Invoice
+        const dueDate = new Date(invoiceTyped.dueDate)
+        if (
+            dueDate < today &&
+            invoiceTyped.status == 2
+        ) {
+            const updatedInvoice = await prisma.invoice.update({
+                where: { id: invoiceTyped.id },
+                data: { status: 5 },
+                include: { lines: true }
+            })
+            return updatedInvoice
+        }
+        return invoice
+    })
+       )
             return updatedInvoices
 
         }
