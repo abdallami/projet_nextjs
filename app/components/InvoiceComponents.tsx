@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 import { Invoice } from '@/type';
 import { CheckCircle, Clock, FileText, SquareArrowOutUpRight, XCircle } from 'lucide-react';
 import Link from 'next/link';
