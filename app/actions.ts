@@ -104,7 +104,7 @@ export async function getInvoicesByEmail(email: string) {
         if (user) {
             const today = new Date()
             const updatedInvoices = await Promise.all(
-                user.invoices.map(async (invoice) => {
+                user.invoices.map(async (invoice: Invoice) => {
                     const dueDate = new Date(invoice.dueDate)
                     if (
                         dueDate < today &&
