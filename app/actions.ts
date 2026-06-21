@@ -95,9 +95,17 @@ export async function getInvoicesByEmail(email: string) {
 
         if (!user) return []
 
+        type InvoiceWithLines = {
+            id: string
+            dueDate: string
+            status: number
+            lines: unknown[]
+            [key: string]: unknown
+        }
+
         const today = new Date()
         const updatedInvoices = await Promise.all(
-            user.invoices.map(async (invoice) => {
+            (user.invoices as InvoiceWithLines[]).map(async (invoice) => {
                 const dueDate = new Date(invoice.dueDate)
                 if (dueDate < today && invoice.status === 2) {
                     return await prisma.invoice.update({
