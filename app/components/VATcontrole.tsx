@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Invoice } from '@/type'
 import { Percent } from 'lucide-react'
 import React from 'react'

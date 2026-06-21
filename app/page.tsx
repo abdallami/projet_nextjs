@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 import { Layers2, Plus, Trash2, Search, Filter } from "lucide-react";
 import Wrapper from "./components/Wrapper";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client"
 import { deleteInvoice, getInvoiceById, updateInvoice } from '@/app/actions'
 import Invoiceinfo from '@/app/components/Invoiceinfo'

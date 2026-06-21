@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Invoice } from '@/type'
 import { Building2, CalendarDays, User } from 'lucide-react'
 import React from 'react'

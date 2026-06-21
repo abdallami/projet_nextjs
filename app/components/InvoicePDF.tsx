@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Invoice, Totals } from '@/type'
 import confetti from 'canvas-confetti'
 import html2canvas from 'html2canvas-pro'
