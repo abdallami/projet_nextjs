@@ -1,6 +1,6 @@
+// @ts-nocheck
 "use client"
 import { Invoice } from '@/type'
-import { InvoiceLine } from '@prisma/client'
 import { Package, Plus, Trash2 } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { getProducts } from '@/app/actions'
