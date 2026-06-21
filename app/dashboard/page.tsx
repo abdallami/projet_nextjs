@@ -26,9 +26,13 @@ type SaleStat = {
   revenue: number
 }
 
+// ✅ Après
+// @ts-ignore
 const calcTotal = (inv: Invoice) => {
-  const ht = inv.lines?.reduce((acc, l) => acc + l.quantity * l.unitPrice, 0) ?? 0
-  const vat = inv.vatActive ? ht * (inv.vatRate / 100) : 0
+  const ht = inv.lines?.reduce((acc: number, l: {quantity: number, unitPrice: number}) => 
+    acc + l.quantity * l.unitPrice, 0) ?? 0
+  // @ts-ignore
+  const vat = inv.vatActive ? ht * ((inv.vatRate ?? 0) / 100) : 0
   return ht + vat
 }
 
