@@ -60,10 +60,11 @@ const getstatusBage=(status: number)=>{
 const InvoiceComponents: React.FC<InvoiceComponentsProps> = ({ invoice,index}) => {
 //calculer la totale 
  const calculetotal = () => {
-  const totalHT = invoice?.lines?.reduce((acc, line) => {
+  const totalHT = invoice?.lines?.reduce((acc: number, line: {quantity: number, unitPrice: number}) => {
     return acc + (line.quantity ?? 0) * (line.unitPrice ?? 0)
-  }, 0)
-  const totalVAT = invoice.vatActive ? totalHT * (invoice.vatRate / 100) : 0
+  }, 0) ?? 0
+  // @ts-ignore
+  const totalVAT = invoice.vatActive ? totalHT * ((invoice.vatRate ?? 0) / 100) : 0
   return totalHT + totalVAT
 }
 
