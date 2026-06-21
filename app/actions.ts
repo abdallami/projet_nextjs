@@ -433,3 +433,46 @@ export async function getLowStockProducts(email: string) {
     return [];
   }
 }
+
+//pour gerez le produits le plus vendus et le moins
+export async function getProductSalesStats(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return []
+
+    // On récupère toutes les lignes des factures PAYÉES (status=3)
+    const lines = await prisma.invoiceLine.findMany({
+      where: {
+        productId: { not: null },
+        invoice: {
+          userId: user.id,
+          status: 3
+        }
+      },
+      include: {
+        product: true
+      }
+    })
+
+    // On regroupe par produit et on somme les quantités vendues
+    const statsMap: Record<string, { name: string; totalSold: number; revenue: number }> = {}
+
+    for (const line of lines) {
+      if (!line.productId || !line.product) continue
+      if (!statsMap[line.productId]) {
+        statsMap[line.productId] = {
+          name: line.product.name,
+          totalSold: 0,
+          revenue: 0,
+        }
+      }
+      statsMap[line.productId].totalSold += line.quantity
+      statsMap[line.productId].revenue += line.quantity * line.unitPrice
+    }
+
+    return Object.values(statsMap).sort((a, b) => b.totalSold - a.totalSold)
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}

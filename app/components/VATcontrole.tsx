@@ -26,7 +26,7 @@ const VATcontrole: React.FC<Props> = ({ invoice, setInvoice }) => {
   return (
     <div className='flex items-center gap-2'>
 
-      {/* Label + toggle */}
+      {/* Label + toggle invoice60169791*/}
       <div className='flex items-center gap-2'>
         <div className='bg-accent/10 text-accent rounded-lg p-1'>
           <Percent className='w-3 h-3' />
