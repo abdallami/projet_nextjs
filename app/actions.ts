@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { Invoice } from "@/type";
 import { randomBytes } from "crypto";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyInvoice = any
 //la fonction qui nous permet de vérifier si l'utilisateur existe déjà ou pas, et s'il n'existe pas, on va le créer.
 export async function checkAndAddUser(email: string, name: string) {
     if (!email) return;
@@ -92,30 +94,27 @@ export async function getInvoicesByEmail(email: string) {
             }
         })
 
-        if (user) {
-            const today = new Date()
-            const updatedInvoices = await Promise.all(
-                user.invoices.map(async (invoice: {
-                    id: string;
-                    dueDate: string;
-                    status: number;
-                    [key: string]: unknown;
-                }) => {
-                    const dueDate = new Date(invoice.dueDate)
-                    if (dueDate < today && invoice.status === 2) {
-                        return await prisma.invoice.update({
-                            where: { id: invoice.id },
-                            data: { status: 5 },
-                            include: { lines: true }
-                        })
-                    }
-                    return invoice
-                })
-            )
-            return updatedInvoices
-        }
+        if (!user) return []
+
+        const today = new Date()
+        const updatedInvoices = await Promise.all(
+            user.invoices.map(async (invoice) => {
+                const dueDate = new Date(invoice.dueDate)
+                if (dueDate < today && invoice.status === 2) {
+                    return await prisma.invoice.update({
+                        where: { id: invoice.id },
+                        data: { status: 5 },
+                        include: { lines: true }
+                    })
+                }
+                return invoice
+            })
+        )
+        return updatedInvoices
+
     } catch (error) {
         console.error(error)
+        return []
     }
 }
 //pour recuperer l'id de chaque facture 
