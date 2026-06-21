@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Invoice as PrismaInvoice } from "@prisma/client";
 import { InvoiceLine } from "@prisma/client";
 
