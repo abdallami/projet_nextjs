@@ -84,46 +84,35 @@ export async function getInvoicesByEmail(email: string) {
     if (!email) return;
     try {
         const user = await prisma.user.findUnique({
-            where: {
-                email: email
-            },
+            where: { email },
             include: {
                 invoices: {
-                    include: {
-                        lines: true,
-                    }
+                    include: { lines: true }
                 }
             }
         })
-        // Statuts possibles :
-        // 1: Brouillon
-        // 2: En attente
-        // 3: Payée
-        // 4: Annulée
-        // 5: Impayé
+
         if (user) {
             const today = new Date()
-           // ✅ Après
-   const updatedInvoices = await Promise.all(
-    user.invoices.map(async (invoice) => {
-        const invoiceTyped = invoice as Invoice
-        const dueDate = new Date(invoiceTyped.dueDate)
-        if (
-            dueDate < today &&
-            invoiceTyped.status == 2
-        ) {
-            const updatedInvoice = await prisma.invoice.update({
-                where: { id: invoiceTyped.id },
-                data: { status: 5 },
-                include: { lines: true }
-            })
-            return updatedInvoice
-        }
-        return invoice
-    })
-       )
+            const updatedInvoices = await Promise.all(
+                user.invoices.map(async (invoice: {
+                    id: string;
+                    dueDate: string;
+                    status: number;
+                    [key: string]: unknown;
+                }) => {
+                    const dueDate = new Date(invoice.dueDate)
+                    if (dueDate < today && invoice.status === 2) {
+                        return await prisma.invoice.update({
+                            where: { id: invoice.id },
+                            data: { status: 5 },
+                            include: { lines: true }
+                        })
+                    }
+                    return invoice
+                })
+            )
             return updatedInvoices
-
         }
     } catch (error) {
         console.error(error)
