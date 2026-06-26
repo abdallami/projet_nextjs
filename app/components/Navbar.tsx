@@ -10,7 +10,7 @@ import { checkAndAddUser } from '../actions'
 
 const navlinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/', label: 'Factures', icon: FileText },
+  { href: '/invoices', label: 'Factures', icon: FileText },
   { href: '/inventory', label: 'Inventaire', icon: Package },
   { href: '/categories', label: 'Catégories', icon: Tag },
 ]
@@ -41,7 +41,7 @@ const Navbar = () => {
         <div className='flex items-center justify-between'>
 
           {/* Logo */}
-          <Link href="/" className='flex items-center gap-2 group'>
+          <Link href="/dashboard" className='flex items-center gap-2 group'>
             <div className='bg-accent/10 text-accent rounded-xl p-2 group-hover:bg-accent/20 transition-colors'>
               <Layers2 className='w-5 h-5' />
             </div>

@@ -150,7 +150,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Link
-              href="/"
+              href="/invoices"
               className="btn btn-xs btn-error btn-outline rounded-lg"
             >
               Voir
@@ -245,7 +245,7 @@ export default function DashboardPage() {
                   Dernières factures
                 </span>
               </div>
-              <Link href="/" className="text-xs text-accent hover:underline">
+              <Link href="/invoices" className="text-xs text-accent hover:underline">
                 Voir tout →
               </Link>
             </div>
