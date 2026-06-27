@@ -90,7 +90,8 @@ export async function getInvoicesByEmail(email: string) {
             where: { email },
             include: {
                 invoices: {
-                    include: { lines: true }
+                    include: { lines: true },
+                    orderBy: { id: 'desc' } 
                 }
             }
         })

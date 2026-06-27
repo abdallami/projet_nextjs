@@ -65,7 +65,10 @@ export default function Home() {
   }
 
   // Filtrage
-  const filtered = invoices.filter((inv) => {
+  // Tri : plus récentes en premier (sécurité côté client)
+ const sorted = [...invoices].sort((a, b) => b.id.localeCompare(a.id))
+
+  const filtered = sorted.filter((inv) => {
     const matchSearch = inv.name.toLowerCase().includes(search.toLowerCase()) ||
       inv.clientName?.toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusFilter === "" || inv.status === parseInt(statusFilter)
