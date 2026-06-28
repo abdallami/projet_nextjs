@@ -54,8 +54,15 @@ export default function Home() {
   // Création facture
   const handleCreateInvoice = async () => {
     try {
-      if (email) await createEmptyInvoice(email, invoiceName)
-      fetchInvoices()
+      if (email) {
+        const newInvoice = await createEmptyInvoice(email, invoiceName)
+        // Ajoute immédiatement en tête sans attendre fetchInvoices
+        if (newInvoice) {
+          setInvoices((prev) => [newInvoice, ...prev])
+        } else {
+          fetchInvoices()
+        }
+      }
       setInvoiceName("")
       ;(document.getElementById('my_modal_3') as HTMLDialogElement).close()
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, zIndex: 9999 })
@@ -66,7 +73,11 @@ export default function Home() {
 
   // Filtrage
   // Tri : plus récentes en premier (sécurité côté client)
- const sorted = [...invoices].sort((a, b) => b.id.localeCompare(a.id))
+  const sorted = [...invoices].sort((a, b) => {
+    const da = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const db = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return db - da
+  })
 
   const filtered = sorted.filter((inv) => {
     const matchSearch = inv.name.toLowerCase().includes(search.toLowerCase()) ||

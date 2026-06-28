@@ -73,8 +73,10 @@ export async function createEmptyInvoice(email:string,name:string){
                 vatActive:false,
                 vatRate:20
 
-            }
+            },
+             include: { lines: true }  // ← ajout
         })
+         return newInvoice  // ← ajout
         }
    
         
