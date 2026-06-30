@@ -478,3 +478,22 @@ export async function getProductSalesStats(email: string) {
     return []
   }
 }
+
+// Vérifie si la quantité demandée est disponible en stock
+export async function checkStockAvailability(
+  productId: string,
+  requestedQty: number
+): Promise<{ available: boolean; stock: number; productName: string }> {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: productId } })
+    if (!product) return { available: false, stock: 0, productName: "" }
+    return {
+      available: product.quantity >= requestedQty,
+      stock: product.quantity,
+      productName: product.name,
+    }
+  } catch (error) {
+    console.error(error)
+    return { available: false, stock: 0, productName: "" }
+  }
+}
