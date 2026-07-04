@@ -223,25 +223,44 @@ export async function updateInvoice(invoice: Invoice) {
       }
     }
 
-    // ✅ Décrémenter le stock si la facture passe à "Payé" (status = 3)
-    const wasAlreadyPaid = existingInvoice.status === 3
-    const isNowPaid = invoice.status === 3
+   // ✅ Gestion stock selon changement de statut
+    const oldStatus = existingInvoice.status
+    const newStatus = invoice.status
 
-    if (isNowPaid && !wasAlreadyPaid) {
-      for (const line of receivedLines) {
-        if (line.productId) {
-          const product = await prisma.product.findUnique({
-            where: { id: line.productId }
-          })
-          if (product) {
-            const newQty = product.quantity - line.quantity
-            await prisma.product.update({
-              where: { id: line.productId },
-              data: { quantity: newQty < 0 ? 0 : newQty }
-            })
-          }
-        }
+    if (oldStatus !== newStatus) {
+      // Brouillon → En attente : réserver
+      if (oldStatus === 1 && newStatus === 2) {
+        await reserveStock(invoice.id)
       }
+
+      // En attente → Payée : confirmer (déduit physique + libère réservation)
+      else if (oldStatus === 2 && newStatus === 3) {
+        await confirmStockOnPayment(invoice.id)
+      }
+
+      // Brouillon → Payée directement
+      else if (oldStatus === 1 && newStatus === 3) {
+        await confirmStockOnPayment(invoice.id)
+      }
+
+     // Annulée : libérer réservation OU restituer stock selon statut précédent
+  else if (newStatus === 4) {
+    if (oldStatus === 2) {
+      await releaseStock(invoice.id)
+    } else if (oldStatus === 3) {
+      for (const line of receivedLines) {
+        if (!line.productId) continue
+        const product = await prisma.product.findUnique({ where: { id: line.productId } })
+        if (!product) continue
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: { quantity: product.quantity + line.quantity }
+        })
+      }
+    }
+  }
+
+      // Impayée (status 5 auto) : garder la réservation
     }
 
   } catch (error) {
@@ -495,5 +514,92 @@ export async function checkStockAvailability(
   } catch (error) {
     console.error(error)
     return { available: false, stock: 0, productName: "" }
+  }
+}
+
+// ── Réserver du stock (facture En attente) ──────────────────
+export async function reserveStock(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: { include: { product: true } } }
+    })
+    if (!invoice) return
+
+    await Promise.all(
+      invoice.lines.map(async (line) => {
+        if (!line.productId) return
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: {
+            reservedQuantity: {
+              increment: line.quantity
+            }
+          }
+        })
+      })
+    )
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Libérer la réservation (facture Annulée / Brouillon) ────
+export async function releaseStock(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: { include: { product: true } } }
+    })
+    if (!invoice) return
+
+    await Promise.all(
+      invoice.lines.map(async (line) => {
+        if (!line.productId) return
+        const product = await prisma.product.findUnique({
+          where: { id: line.productId }
+        })
+        if (!product) return
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: {
+            reservedQuantity: Math.max(0, product.reservedQuantity - line.quantity)
+          }
+        })
+      })
+    )
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Confirmer le paiement (facture Payée) ───────────────────
+export async function confirmStockOnPayment(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: { include: { product: true } } }
+    })
+    if (!invoice) return
+
+    await Promise.all(
+      invoice.lines.map(async (line) => {
+        if (!line.productId) return
+        const product = await prisma.product.findUnique({
+          where: { id: line.productId }
+        })
+        if (!product) return
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: {
+            // Déduit du stock physique ET libère la réservation
+            quantity: Math.max(0, product.quantity - line.quantity),
+            reservedQuantity: Math.max(0, product.reservedQuantity - line.quantity)
+          }
+        })
+      })
+    )
+  } catch (error) {
+    console.error(error)
   }
 }

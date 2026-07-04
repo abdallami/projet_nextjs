@@ -69,6 +69,7 @@ model Product {
   description  String        @default("")
   price        Float         @default(0)
   quantity     Int           @default(0)
+  reservedQuantity Int       @default(0)   // ← ajouter cette ligne
   alertQty     Int           @default(5)   // alerte stock faible
   categoryId   String?
   category     Category?     @relation("CategoryProducts", fields: [categoryId], references: [id])

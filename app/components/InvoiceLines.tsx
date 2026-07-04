@@ -11,6 +11,7 @@ type ProductOption = {
   name: string
   price: number
   quantity: number
+  reservedQuantity: number  // ← ajouter
 }
 
 // Erreurs de stock par index de ligne
@@ -39,21 +40,23 @@ const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
 
   // Calcule le stock réellement disponible pour un produit,
   // en soustrayant les quantités déjà utilisées dans les autres lignes
-  const getAvailableStock = (productId: string, currentIndex: number): number => {
-    const product = products.find((p) => p.id === productId)
-    if (!product) return 0
+ const getAvailableStock = (productId: string, currentIndex: number): number => {
+  const product = products.find((p) => p.id === productId)
+  if (!product) return 0
 
-    // Quantité déjà réservée par les autres lignes de cette facture
-    const usedInOtherLines = invoice.lines.reduce((total, line, idx) => {
-      if (idx !== currentIndex && line.productId === productId) {
-        return total + (line.quantity ?? 0)
-      }
-      return total
-    }, 0)
+  // Stock libre = physique - déjà réservé en base
+  const freeStock = product.quantity - product.reservedQuantity
 
-    return Math.max(0, product.quantity - usedInOtherLines)
-  }
+  // Quantité utilisée dans les autres lignes de CETTE facture
+  const usedInOtherLines = invoice.lines.reduce((total, line, idx) => {
+    if (idx !== currentIndex && line.productId === productId) {
+      return total + (line.quantity ?? 0)
+    }
+    return total
+  }, 0)
 
+  return Math.max(0, freeStock - usedInOtherLines)
+}
   // Valide toutes les lignes et retourne les erreurs
   const validateLines = (lines: typeof invoice.lines) => {
     const errors: StockErrors = {}
