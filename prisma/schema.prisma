@@ -51,6 +51,7 @@ model User {
   invoices   Invoice[]  @relation("UserInvoices")
   products   Product[]  @relation("UserProducts")
   categories Category[] @relation("UserCategories")
+  transactions Transaction[] @relation("UserTransactions")
 }
 
 model Category {
@@ -108,4 +109,15 @@ model InvoiceLine {
   invoice     Invoice? @relation("InvoiceLines", fields: [invoiceId], references: [id], onDelete: Cascade)
   productId   String?
   product     Product? @relation("ProductLines", fields: [productId], references: [id])
+}
+model Transaction {
+  id          String   @id @default(uuid())
+  type        String   // "entree" ou "sortie"
+  category    String   @default("") // "facture", "achat_stock", "loyer", "transport", etc.
+  description String   @default("")
+  amount      Float    @default(0)
+  date        String   @default("")
+  userId      String
+  createdBy   User     @relation("UserTransactions", fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
 }

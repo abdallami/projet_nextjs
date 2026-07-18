@@ -5,12 +5,14 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { UserButton, useUser } from '@clerk/nextjs'
-import { Layers2, LayoutDashboard, FileText, Package, Tag, Menu, X } from 'lucide-react'
+import { Layers2, LayoutDashboard, FileText, Package, Tag, Menu, X, Receipt, BarChart3 } from 'lucide-react'
 import { checkAndAddUser } from '../actions'
 
 const navlinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/invoices', label: 'Factures', icon: FileText },
+  { href: '/transactions', label: 'Transactions', icon: Receipt },
+  { href: '/rapport', label: 'Rapport', icon: BarChart3 },
   { href: '/inventory', label: 'Inventaire', icon: Package },
   { href: '/categories', label: 'Catégories', icon: Tag },
 ]

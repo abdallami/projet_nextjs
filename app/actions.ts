@@ -234,15 +234,59 @@ export async function updateInvoice(invoice: Invoice) {
         await reserveStock(invoice.id)
       }
 
-      // En attente → Payée : confirmer (déduit physique + libère réservation)
-      else if (oldStatus === 2 && newStatus === 3) {
-        await confirmStockOnPayment(invoice.id)
+     // En attente → Payée : confirmer (déduit physique + libère réservation)
+else if (oldStatus === 2 && newStatus === 3) {
+  await confirmStockOnPayment(invoice.id)
+  // Créer transaction entrée automatique
+  const user = await prisma.user.findUnique({
+    where: { id: existingInvoice.userId }
+  })
+  if (user) {
+    const totalHT = receivedLines.reduce(
+      (acc, l) => acc + l.quantity * l.unitPrice, 0
+    )
+    const totalTTC = invoice.vatActive
+      ? totalHT * (1 + (invoice.vatRate ?? 0) / 100)
+      : totalHT
+    await prisma.transaction.create({
+      data: {
+        type: 'entree',
+        category: 'Facture payée',
+        description: `Facture : ${invoice.name}${invoice.clientName ? ` — ${invoice.clientName}` : ''}`,
+        amount: totalTTC,
+        date: new Date().toISOString().split('T')[0],
+        userId: user.id,
       }
+    })
+  }
+}
 
-      // Brouillon → Payée directement
-      else if (oldStatus === 1 && newStatus === 3) {
-        await confirmStockOnPayment(invoice.id)
+// Brouillon → Payée directement
+else if (oldStatus === 1 && newStatus === 3) {
+  await confirmStockOnPayment(invoice.id)
+  // Créer transaction entrée automatique
+  const user = await prisma.user.findUnique({
+    where: { id: existingInvoice.userId }
+  })
+  if (user) {
+    const totalHT = receivedLines.reduce(
+      (acc, l) => acc + l.quantity * l.unitPrice, 0
+    )
+    const totalTTC = invoice.vatActive
+      ? totalHT * (1 + (invoice.vatRate ?? 0) / 100)
+      : totalHT
+    await prisma.transaction.create({
+      data: {
+        type: 'entree',
+        category: 'Facture payée',
+        description: `Facture : ${invoice.name}${invoice.clientName ? ` — ${invoice.clientName}` : ''}`,
+        amount: totalTTC,
+        date: new Date().toISOString().split('T')[0],
+        userId: user.id,
       }
+    })
+  }
+}
 
      // Annulée : libérer réservation OU restituer stock selon statut précédent
   else if (newStatus === 4) {
@@ -362,17 +406,21 @@ export async function createProduct(
     name: string;
     description: string;
     price: number;
-    purchasePrice: number  // ← ajouter
+    purchasePrice: number;
     quantity: number;
     alertQty: number;
-    categoryId?: string;
+    categoryId?: string | null;
   }
 ) {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error("Utilisateur introuvable");
+
     return await prisma.product.create({
-      data: { ...data, userId: user.id },
+      data: {
+        ...data,
+        userId: user.id,
+      },
     });
   } catch (error) {
     console.error(error);
@@ -385,17 +433,38 @@ export async function updateProduct(
     name: string;
     description: string;
     price: number;
-    purchasePrice: number  // ← ajouter
+    purchasePrice: number;
     quantity: number;
     alertQty: number;
     categoryId?: string | null;
   }
 ) {
   try {
-    return await prisma.product.update({
+    const oldProduct = await prisma.product.findUnique({ where: { id } });
+
+    const updated = await prisma.product.update({
       where: { id },
       data,
     });
+
+    if (oldProduct && data.quantity > oldProduct.quantity) {
+      const qtyAdded = data.quantity - oldProduct.quantity;
+      const purchasePrice = data.purchasePrice > 0 ? data.purchasePrice : data.price;
+      const montantAchat = qtyAdded * purchasePrice;
+
+      await prisma.transaction.create({
+        data: {
+          type: 'sortie',
+          category: 'Achat stock',
+          description: `Achat ${qtyAdded} × ${data.name} à ${purchasePrice.toLocaleString('fr-FR')} FCFA/u`,
+          amount: montantAchat,
+          date: new Date().toISOString().split('T')[0],
+          userId: oldProduct.userId,
+        },
+      });
+    }
+
+    return updated;
   } catch (error) {
     console.error(error);
   }
@@ -709,5 +778,52 @@ export async function getTrashedInvoices(email: string) {
   } catch (error) {
     console.error(error)
     return []
+  }
+}
+
+
+// ── Créer une transaction (entrée ou sortie) ────────────────
+export async function createTransaction(
+  email: string,
+  data: {
+    type: string        // "entree" ou "sortie"
+    category: string
+    description: string
+    amount: number
+    date: string
+  }
+) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return
+    return await prisma.transaction.create({
+      data: { ...data, userId: user.id }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Récupérer toutes les transactions ───────────────────────
+export async function getTransactions(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return []
+    return await prisma.transaction.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' }
+    })
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+// ── Supprimer une transaction ────────────────────────────────
+export async function deleteTransaction(id: string) {
+  try {
+    await prisma.transaction.delete({ where: { id } })
+  } catch (error) {
+    console.error(error)
   }
 }
