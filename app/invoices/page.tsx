@@ -135,7 +135,6 @@ export default function Home() {
               className="btn btn-sm btn-ghost rounded-lg gap-2 border border-base-300"
             >
               <Trash2 className="w-4 h-4 text-error" />
-              <span>cliquer ici pour accéder à la corbeille</span>
               <span className="hidden sm:inline">Corbeille</span>
             </Link>
             <button
