@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client"
-import { deleteInvoice, getInvoiceById, updateInvoice } from '@/app/actions'
+import { softDeleteInvoice, getInvoiceById, updateInvoice } from '@/app/actions'
 import Invoiceinfo from '@/app/components/Invoiceinfo'
 import InvoiceLines from '@/app/components/InvoiceLines'
 import InvoicePDF from '@/app/components/InvoicePDF'
@@ -84,11 +84,11 @@ const Page = ({ params }: { params: Promise<{ invoiceId: string }> }) => {
   }
 
   const handleDelete = async () => {
-    const confirmed = window.confirm("Êtes-vous sûr de vouloir supprimer cette facture ?")
+    const confirmed = window.confirm("Envoyer cette facture en corbeille ?")
     if (confirmed) {
       try {
-        await deleteInvoice(invoice?.id as string)
-        router.push("/")
+        await softDeleteInvoice(invoice?.id as string)
+        router.push("/invoices")
       } catch (error) {
         console.error("Erreur lors de la suppression :", error)
       }

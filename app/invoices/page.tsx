@@ -4,7 +4,8 @@ import { Layers2, Plus, Trash2, Search, Filter } from "lucide-react";
 import Wrapper from "../components/Wrapper";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { createEmptyInvoice, getInvoicesByEmail, deleteInvoice } from "../actions";
+import Link from "next/link";
+import { createEmptyInvoice, getInvoicesByEmail, softDeleteInvoice } from "../actions";
 import confetti from "canvas-confetti";
 import { Invoice } from "@/type";
 import InvoiceComponents from "../components/InvoiceComponents";
@@ -106,7 +107,7 @@ export default function Home() {
     if (!confirm(`Supprimer ${selected.length} facture(s) ?`)) return
     setIsDeleting(true)
     try {
-      await Promise.all(selected.map((id) => deleteInvoice(id)))
+      await Promise.all(selected.map((id) => softDeleteInvoice(id)))
       setSelected([])
       fetchInvoices()
     } catch (error) {
@@ -128,13 +129,23 @@ export default function Home() {
               {invoices.length} facture{invoices.length > 1 ? 's' : ''} au total
             </p>
           </div>
-          <button
-            className="btn btn-accent rounded-lg gap-2"
-            onClick={() => (document.getElementById('my_modal_3') as HTMLDialogElement).showModal()}
-          >
-            <Plus className="w-4 h-4" />
-            Nouvelle facture
-          </button>
+          <div className="flex gap-2">
+            <Link
+              href="/invoices/trash"
+              className="btn btn-sm btn-ghost rounded-lg gap-2 border border-base-300"
+            >
+              <Trash2 className="w-4 h-4 text-error" />
+              <span>cliquer ici pour accéder à la corbeille</span>
+              <span className="hidden sm:inline">Corbeille</span>
+            </Link>
+            <button
+              className="btn btn-accent rounded-lg gap-2"
+              onClick={() => (document.getElementById('my_modal_3') as HTMLDialogElement).showModal()}
+            >
+              <Plus className="w-4 h-4" />
+              Nouvelle facture
+            </button>
+          </div>
         </div>
 
         {/* Barre de recherche + filtres */}
@@ -189,7 +200,7 @@ export default function Home() {
                   ? <span className="loading loading-spinner loading-xs" />
                   : <Trash2 className="w-3.5 h-3.5" />
                 }
-                Supprimer
+                Déplacer vers la corbeille
               </button>
             </div>
           </div>

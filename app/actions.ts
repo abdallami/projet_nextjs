@@ -93,6 +93,7 @@ export async function getInvoicesByEmail(email: string) {
             include: {
                 invoices: {
                     include: { lines: true },
+                     where: { deletedAt: null },// ← exclure la corbeille
                     orderBy: { id: 'desc' } 
                 }
             }
@@ -133,7 +134,7 @@ export async function getInvoicesByEmail(email: string) {
 export async function getInvoiceById(invoiceId:string){
     try{
         const invoice = await prisma.invoice.findUnique({
-            where:{id:invoiceId},
+            where:{id:invoiceId, deletedAt: null},
             include:{
                 lines:true
             }
@@ -269,16 +270,7 @@ export async function updateInvoice(invoice: Invoice) {
 }
 //pour supprimer
 export async function deleteInvoice(invoiceId:string){
- try{
-   const deleteInvoice =await prisma.invoice.delete({
-        where:{id:invoiceId}
-    })
-  if(!deleteInvoice){
-    throw new Error("Erreur lors de la suppression de la facture")
-  }
- }catch(error){
-   console.error(error)
- }
+  return softDeleteInvoice(invoiceId)
 }
 
 // pour les categorie et produits 
@@ -370,6 +362,7 @@ export async function createProduct(
     name: string;
     description: string;
     price: number;
+    purchasePrice: number  // ← ajouter
     quantity: number;
     alertQty: number;
     categoryId?: string;
@@ -392,6 +385,7 @@ export async function updateProduct(
     name: string;
     description: string;
     price: number;
+    purchasePrice: number  // ← ajouter
     quantity: number;
     alertQty: number;
     categoryId?: string | null;
@@ -601,5 +595,119 @@ export async function confirmStockOnPayment(invoiceId: string) {
     )
   } catch (error) {
     console.error(error)
+  }
+}
+// Import produits depuis Excel
+export async function importProductsFromExcel(
+  email: string,
+  products: {
+    name: string
+    description: string
+    price: number
+    quantity: number
+    alertQty: number
+  }[]
+) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) throw new Error("Utilisateur introuvable")
+
+    const created = await Promise.all(
+      products.map((p) =>
+        prisma.product.create({
+          data: {
+            name: p.name || "Sans nom",
+            description: p.description || "",
+            price: isNaN(p.price) ? 0 : p.price,
+            quantity: isNaN(p.quantity) ? 0 : p.quantity,
+            alertQty: isNaN(p.alertQty) ? 5 : p.alertQty,
+            reservedQuantity: 0,
+            userId: user.id,
+          },
+        })
+      )
+    )
+    return { success: true, count: created.length }
+  } catch (error) {
+    console.error(error)
+    return { success: false, count: 0 }
+  }
+}
+
+// ── Envoyer en corbeille (soft delete) ─────────────────────
+export async function softDeleteInvoice(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: true }
+    })
+    if (!invoice) return
+
+    // Libérer la réservation si En attente ou Impayée
+    if (invoice.status === 2 || invoice.status === 5) {
+      await releaseStock(invoiceId)
+    }
+
+    await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { deletedAt: new Date() }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Restaurer depuis la corbeille ───────────────────────────
+export async function restoreInvoice(invoiceId: string) {
+  try {
+    await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { deletedAt: null }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Supprimer définitivement ────────────────────────────────
+export async function permanentDeleteInvoice(invoiceId: string) {
+  try {
+    await prisma.invoice.delete({
+      where: { id: invoiceId }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Récupérer les factures en corbeille ─────────────────────
+export async function getTrashedInvoices(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return []
+
+    // Nettoyer automatiquement les factures de plus de 30 jours
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    await prisma.invoice.deleteMany({
+      where: {
+        userId: user.id,
+        deletedAt: { not: null, lte: thirtyDaysAgo }
+      }
+    })
+
+    // Retourner les factures restantes dans la corbeille
+    return await prisma.invoice.findMany({
+      where: {
+        userId: user.id,
+        deletedAt: { not: null }
+      },
+      include: { lines: true },
+      orderBy: { deletedAt: 'desc' }
+    })
+  } catch (error) {
+    console.error(error)
+    return []
   }
 }

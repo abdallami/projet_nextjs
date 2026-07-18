@@ -7,7 +7,7 @@ import { getInvoicesByEmail, getProductSalesStats } from "../actions"
 import { getProducts, getLowStockProducts } from "../actions"
 import {
   AlertTriangle, TrendingUp, FileText,
-  Package, Clock, XCircle, Banknote, BarChart3
+  Package, Clock, XCircle, Banknote, BarChart3, ShoppingBag
 } from "lucide-react"
 import Link from "next/link"
 import { Invoice } from "@/type"
@@ -17,6 +17,7 @@ type Product = {
   name: string
   quantity: number
   alertQty: number
+  purchasePrice: number
   price: number
   category: { name: string } | null
 }
@@ -27,12 +28,9 @@ type SaleStat = {
   revenue: number
 }
 
-
-
 const calcTotal = (inv: Invoice) => {
-  const ht = inv.lines?.reduce((acc: number, l: {quantity: number, unitPrice: number}) => 
+  const ht = inv.lines?.reduce((acc: number, l: { quantity: number, unitPrice: number }) =>
     acc + l.quantity * l.unitPrice, 0) ?? 0
-  
   const vat = inv.vatActive ? ht * ((inv.vatRate ?? 0) / 100) : 0
   return ht + vat
 }
@@ -74,7 +72,7 @@ export default function DashboardPage() {
     load()
   }, [email])
 
-  // Calculs financiers
+  // ── Calculs financiers factures ─────────────────────────────
   const facturesPayees = invoices.filter((i) => i.status === 3)
   const facturesImpayees = invoices.filter((i) => i.status === 5)
   const facturesEnAttente = invoices.filter((i) => i.status === 2)
@@ -82,12 +80,43 @@ export default function DashboardPage() {
   const totalCA = facturesPayees.reduce((acc, inv) => acc + calcTotal(inv), 0)
   const totalImpaye = facturesImpayees.reduce((acc, inv) => acc + calcTotal(inv), 0)
   const totalEnAttente = facturesEnAttente.reduce((acc, inv) => acc + calcTotal(inv), 0)
-  const valeurStock = products.reduce((acc, p) => acc + p.price * p.quantity, 0)
+
+  // ── Bénéfice potentiel stock ────────────────────────────────
+  // = (prix vente - prix achat) × quantité en stock
+  const beneficeStockPotentiel = products.reduce((acc, p) => {
+    if (!p.purchasePrice || p.purchasePrice === 0) return acc
+    return acc + (p.price - p.purchasePrice) * p.quantity
+  }, 0)
+
+  // Valeur stock au prix d'achat (coût réel)
+  const valeurStockAchat = products.reduce((acc, p) => {
+    return acc + (p.purchasePrice > 0 ? p.purchasePrice : p.price) * p.quantity
+  }, 0)
+
+  // Valeur stock au prix de vente
+  const valeurStockVente = products.reduce((acc, p) => acc + p.price * p.quantity, 0)
+
+  // ── Bénéfice réel sur factures payées ──────────────────────
+  // Pour chaque ligne d'une facture payée, on calcule :
+  // (prix de vente facturé - prix d'achat du produit) × quantité
+  const beneficeReelFactures = facturesPayees.reduce((acc, inv) => {
+    const beneficeFacture = inv.lines?.reduce((lineAcc, line) => {
+      // Trouver le produit correspondant pour avoir son prix d'achat
+      const product = products.find((p) => p.id === line.productId)
+      if (product && product.purchasePrice > 0) {
+        // Bénéfice = (prix vendu - prix achat) × quantité
+        return lineAcc + (line.unitPrice - product.purchasePrice) * line.quantity
+      }
+      // Si pas de prix d'achat, on ne peut pas calculer le bénéfice
+      return lineAcc
+    }, 0) ?? 0
+    return acc + beneficeFacture
+  }, 0)
 
   const stats = [
     {
       label: "Chiffre d'affaires",
-      value: `${totalCA.toLocaleString()} FCFA`,
+      value: `${totalCA.toLocaleString('fr-FR')} FCFA`,
       sub: `${facturesPayees.length} facture(s) payée(s)`,
       icon: TrendingUp,
       color: "text-success",
@@ -95,7 +124,7 @@ export default function DashboardPage() {
     },
     {
       label: "Montant impayé",
-      value: `${totalImpaye.toLocaleString()} FCFA`,
+      value: `${totalImpaye.toLocaleString('fr-FR')} FCFA`,
       sub: `${facturesImpayees.length} facture(s) impayée(s)`,
       icon: XCircle,
       color: "text-error",
@@ -103,7 +132,7 @@ export default function DashboardPage() {
     },
     {
       label: "En attente",
-      value: `${totalEnAttente.toLocaleString()} FCFA`,
+      value: `${totalEnAttente.toLocaleString('fr-FR')} FCFA`,
       sub: `${facturesEnAttente.length} facture(s) en attente`,
       icon: Clock,
       color: "text-warning",
@@ -111,7 +140,7 @@ export default function DashboardPage() {
     },
     {
       label: "Valeur du stock",
-      value: `${valeurStock.toLocaleString()} FCFA`,
+      value: `${valeurStockVente.toLocaleString('fr-FR')} FCFA`,
       sub: `${products.length} produit(s) en stock`,
       icon: Banknote,
       color: "text-accent",
@@ -127,9 +156,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-1">Dashboard</h1>
-            <p className="text-sm text-gray-500">
-              {"Vue d'ensemble de votre activité commerciale"}
-            </p>
+            <p className="text-sm text-gray-500">Vue d&apos;ensemble de votre activité commerciale</p>
           </div>
           <div className="bg-accent/10 text-accent rounded-xl p-2.5">
             <BarChart3 className="w-5 h-5" />
@@ -141,34 +168,22 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 bg-error/10 border border-error/20 rounded-xl px-5 py-4">
             <AlertTriangle className="w-5 h-5 text-error shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-error">
-                Attention — Montant impayé élevé
-              </p>
+              <p className="text-sm font-semibold text-error">Attention — Montant impayé élevé</p>
               <p className="text-xs text-error/70 mt-0.5">
                 {facturesImpayees.length} client(s) vous doivent{" "}
-                <strong>{totalImpaye.toLocaleString()} FCFA</strong>
+                <strong>{totalImpaye.toLocaleString('fr-FR')} FCFA</strong>
               </p>
             </div>
-            <Link
-              href="/invoices"
-              className="btn btn-xs btn-error btn-outline rounded-lg"
-            >
-              Voir
-            </Link>
+            <Link href="/invoices" className="btn btn-xs btn-error btn-outline rounded-lg">Voir</Link>
           </div>
         )}
 
         {/* Cartes stats financières */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map(({ label, value, sub, icon: Icon, color, bg }) => (
-            <div
-              key={label}
-              className="bg-base-200 rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
-            >
+            <div key={label} className="bg-base-200 rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  {label}
-                </span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</span>
                 <div className={`${bg} ${color} rounded-lg p-1.5`}>
                   <Icon className="w-3.5 h-3.5" />
                 </div>
@@ -181,6 +196,96 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* ── Section Bénéfices ───────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Bénéfice réel sur factures payées */}
+          <div className="bg-base-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="bg-emerald-100 text-emerald-600 rounded-lg p-1.5">
+                <ShoppingBag className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Bénéfice réel — Factures payées
+              </span>
+            </div>
+            <p className="text-3xl font-black text-emerald-600 mb-1">
+              {beneficeReelFactures.toLocaleString('fr-FR')} FCFA
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              Bénéfice calculé sur {facturesPayees.length} facture(s) payée(s)
+            </p>
+            {/* Détail CA vs coût */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Chiffre d&apos;affaires encaissé</span>
+                <span className="text-xs font-bold text-success">{totalCA.toLocaleString('fr-FR')} FCFA</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Coût des produits vendus</span>
+                <span className="text-xs font-bold text-error">
+                  -{(totalCA - beneficeReelFactures).toLocaleString('fr-FR')} FCFA
+                </span>
+              </div>
+              <div className="border-t border-base-300 pt-2 flex justify-between items-center">
+                <span className="text-xs font-semibold text-gray-700">Bénéfice net estimé</span>
+                <span className={`text-xs font-black ${beneficeReelFactures >= 0 ? 'text-emerald-600' : 'text-error'}`}>
+                  {beneficeReelFactures >= 0 ? '+' : ''}{beneficeReelFactures.toLocaleString('fr-FR')} FCFA
+                </span>
+              </div>
+            </div>
+            {beneficeReelFactures === 0 && facturesPayees.length > 0 && (
+              <p className="text-xs text-gray-400 mt-3 italic">
+                Ajoutez des prix d&apos;achat à vos produits pour voir le bénéfice réel
+              </p>
+            )}
+          </div>
+
+          {/* Bénéfice potentiel stock */}
+          <div className="bg-base-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="bg-blue-100 text-blue-600 rounded-lg p-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Bénéfice potentiel — Stock actuel
+              </span>
+            </div>
+            <p className="text-3xl font-black text-blue-600 mb-1">
+              {beneficeStockPotentiel.toLocaleString('fr-FR')} FCFA
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              Si vous vendez tout votre stock actuel
+            </p>
+            {/* Détail stock achat vs vente */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Valeur stock (prix achat)</span>
+                <span className="text-xs font-bold text-error">
+                  {valeurStockAchat.toLocaleString('fr-FR')} FCFA
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Valeur stock (prix vente)</span>
+                <span className="text-xs font-bold text-success">
+                  {valeurStockVente.toLocaleString('fr-FR')} FCFA
+                </span>
+              </div>
+              <div className="border-t border-base-300 pt-2 flex justify-between items-center">
+                <span className="text-xs font-semibold text-gray-700">Bénéfice potentiel</span>
+                <span className={`text-xs font-black ${beneficeStockPotentiel >= 0 ? 'text-blue-600' : 'text-error'}`}>
+                  +{beneficeStockPotentiel.toLocaleString('fr-FR')} FCFA
+                </span>
+              </div>
+            </div>
+            {beneficeStockPotentiel === 0 && (
+              <p className="text-xs text-gray-400 mt-3 italic">
+                Ajoutez des prix d&apos;achat à vos produits pour voir le bénéfice potentiel
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Stock faible + Dernières factures */}
         <div className="grid lg:grid-cols-2 gap-6">
 
@@ -191,16 +296,12 @@ export default function DashboardPage() {
                 <div className="bg-accent/10 text-accent rounded-lg p-1.5">
                   <Package className="w-3.5 h-3.5" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Stock faible
-                </span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Stock faible</span>
                 {lowStock.length > 0 && (
                   <span className="badge badge-error badge-sm">{lowStock.length}</span>
                 )}
               </div>
-              <Link href="/inventory" className="text-xs text-accent hover:underline">
-                Gérer →
-              </Link>
+              <Link href="/inventory" className="text-xs text-accent hover:underline">Gérer →</Link>
             </div>
             {lowStock.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-gray-400 gap-2">
@@ -210,23 +311,14 @@ export default function DashboardPage() {
             ) : (
               <div className="flex flex-col gap-2">
                 {lowStock.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between bg-base-100 rounded-xl px-4 py-2.5"
-                  >
+                  <div key={p.id} className="flex items-center justify-between bg-base-100 rounded-xl px-4 py-2.5">
                     <div>
                       <p className="font-medium text-sm">{p.name}</p>
-                      <p className="text-xs text-gray-400">
-                        {p.category?.name ?? "Sans catégorie"}
-                      </p>
+                      <p className="text-xs text-gray-400">{p.category?.name ?? "Sans catégorie"}</p>
                     </div>
                     <div className="text-right">
-                      <span className="badge badge-error badge-sm">
-                        {p.quantity} restant(s)
-                      </span>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        seuil : {p.alertQty}
-                      </p>
+                      <span className="badge badge-error badge-sm">{p.quantity} restant(s)</span>
+                      <p className="text-xs text-gray-400 mt-0.5">seuil : {p.alertQty}</p>
                     </div>
                   </div>
                 ))}
@@ -241,13 +333,9 @@ export default function DashboardPage() {
                 <div className="bg-accent/10 text-accent rounded-lg p-1.5">
                   <FileText className="w-3.5 h-3.5" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Dernières factures
-                </span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Dernières factures</span>
               </div>
-              <Link href="/invoices" className="text-xs text-accent hover:underline">
-                Voir tout →
-              </Link>
+              <Link href="/invoices" className="text-xs text-accent hover:underline">Voir tout →</Link>
             </div>
             {invoices.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-gray-400 gap-2">
@@ -260,22 +348,15 @@ export default function DashboardPage() {
                   const { label, className } = statusLabel(inv.status)
                   const total = calcTotal(inv)
                   return (
-                    <Link
-                      key={inv.id}
-                      href={`/invoice/${inv.id}`}
-                      className="flex items-center justify-between bg-base-100 rounded-xl px-4 py-2.5 hover:bg-base-300 transition-all group"
-                    >
+                    <Link key={inv.id} href={`/invoice/${inv.id}`}
+                      className="flex items-center justify-between bg-base-100 rounded-xl px-4 py-2.5 hover:bg-base-300 transition-all group">
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate group-hover:text-accent transition-colors">
-                          {inv.name}
-                        </p>
+                        <p className="font-medium text-sm truncate group-hover:text-accent transition-colors">{inv.name}</p>
                         <p className="text-xs text-gray-400">{inv.clientName || "—"}</p>
                       </div>
                       <div className="text-right shrink-0 ml-2">
                         <span className={`badge badge-sm ${className}`}>{label}</span>
-                        <p className="text-xs font-semibold mt-0.5">
-                          {total.toLocaleString()} FCFA
-                        </p>
+                        <p className="text-xs font-semibold mt-0.5">{total.toLocaleString('fr-FR')} FCFA</p>
                       </div>
                     </Link>
                   )
@@ -292,20 +373,16 @@ export default function DashboardPage() {
               <div className="bg-accent/10 text-accent rounded-lg p-1.5">
                 <Package className="w-3.5 h-3.5" />
               </div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Résumé inventaire
-              </span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Résumé inventaire</span>
             </div>
-            <Link href="/inventory" className="text-xs text-accent hover:underline">
-              Gérer →
-            </Link>
+            <Link href="/inventory" className="text-xs text-accent hover:underline">Gérer →</Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { value: products.length, label: "Produits total", color: "text-base-content" },
               { value: lowStock.length, label: "Stock faible", color: "text-error" },
               { value: products.reduce((acc, p) => acc + p.quantity, 0), label: "Unités en stock", color: "text-accent" },
-              { value: `${valeurStock.toLocaleString()} F`, label: "Valeur totale", color: "text-success" },
+              { value: `${valeurStockVente.toLocaleString('fr-FR')} F`, label: "Valeur totale", color: "text-success" },
             ].map(({ value, label, color }) => (
               <div key={label} className="bg-base-100 rounded-xl p-4 text-center">
                 <p className={`text-xl font-black ${color}`}>{value}</p>
@@ -318,8 +395,6 @@ export default function DashboardPage() {
         {/* Produits les plus et moins vendus */}
         {salesStats.length > 0 ? (
           <div className="grid lg:grid-cols-2 gap-6">
-
-            {/* Plus vendus */}
             <div className="bg-base-200 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="bg-success/10 text-success rounded-lg p-1.5">
@@ -331,32 +406,19 @@ export default function DashboardPage() {
               </div>
               <div className="flex flex-col gap-2">
                 {salesStats.slice(0, 5).map((p, i) => (
-                  <div
-                    key={p.name}
-                    className="flex items-center gap-3 bg-base-100 rounded-xl px-4 py-2.5"
-                  >
-                    <span className={`text-sm font-black w-5 text-center shrink-0 ${
-                      i === 0 ? 'text-yellow-500' :
-                      i === 1 ? 'text-gray-400' :
-                      i === 2 ? 'text-amber-600' : 'text-gray-300'
-                    }`}>
+                  <div key={p.name} className="flex items-center gap-3 bg-base-100 rounded-xl px-4 py-2.5">
+                    <span className="text-sm font-black w-5 text-center shrink-0">
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{p.name}</p>
-                      <p className="text-xs text-gray-400">
-                        {p.revenue.toLocaleString()} FCFA de revenus
-                      </p>
+                      <p className="text-xs text-gray-400">{p.revenue.toLocaleString('fr-FR')} FCFA de revenus</p>
                     </div>
-                    <span className="badge badge-success badge-sm shrink-0">
-                      {p.totalSold} vendus
-                    </span>
+                    <span className="badge badge-success badge-sm shrink-0">{p.totalSold} vendus</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Moins vendus */}
             <div className="bg-base-200 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="bg-warning/10 text-warning rounded-lg p-1.5">
@@ -368,24 +430,16 @@ export default function DashboardPage() {
               </div>
               <div className="flex flex-col gap-2">
                 {salesStats.slice(-5).reverse().map((p) => (
-                  <div
-                    key={p.name}
-                    className="flex items-center gap-3 bg-base-100 rounded-xl px-4 py-2.5"
-                  >
+                  <div key={p.name} className="flex items-center gap-3 bg-base-100 rounded-xl px-4 py-2.5">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{p.name}</p>
-                      <p className="text-xs text-gray-400">
-                        {p.revenue.toLocaleString()} FCFA de revenus
-                      </p>
+                      <p className="text-xs text-gray-400">{p.revenue.toLocaleString('fr-FR')} FCFA de revenus</p>
                     </div>
-                    <span className="badge badge-warning badge-sm shrink-0">
-                      {p.totalSold} vendus
-                    </span>
+                    <span className="badge badge-warning badge-sm shrink-0">{p.totalSold} vendus</span>
                   </div>
                 ))}
               </div>
             </div>
-
           </div>
         ) : (
           <div className="bg-base-200 rounded-2xl p-8 text-center text-gray-400">
