@@ -179,19 +179,19 @@ export default function Home() {
 
         {/* Barre d'actions sélection */}
         {selected.length > 0 && (
-          <div className="flex items-center justify-between bg-error/10 border border-error/20 rounded-xl px-4 py-3">
-            <span className="text-sm font-medium text-error">
+          <div className="flex flex-col gap-3 rounded-xl border border-error/20 bg-error/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-error break-words">
               {selected.length} facture{selected.length > 1 ? 's' : ''} sélectionnée{selected.length > 1 ? 's' : ''}
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
               <button
-                className="btn btn-sm btn-ghost"
+                className="btn btn-sm btn-ghost w-full sm:w-auto"
                 onClick={() => setSelected([])}
               >
                 Annuler
               </button>
               <button
-                className="btn btn-sm btn-error gap-1.5"
+                className="btn btn-sm btn-error gap-1.5 w-full sm:w-auto"
                 onClick={handleDeleteSelected}
                 disabled={isDeleting}
               >

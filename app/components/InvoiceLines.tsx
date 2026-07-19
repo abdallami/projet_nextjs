@@ -1,8 +1,8 @@
 // @ts-nocheck
 "use client"
 import { Invoice } from '@/type'
-import { AlertTriangle, Package, Plus, Trash2 } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import { AlertTriangle, Package, Plus, Trash2, Search, X } from 'lucide-react'
+import React, { useEffect, useState, useRef } from 'react'
 import { getProducts } from '@/app/actions'
 import { useUser } from '@clerk/nextjs'
 
@@ -11,10 +11,9 @@ type ProductOption = {
   name: string
   price: number
   quantity: number
-  reservedQuantity: number  // ← ajouter
+  reservedQuantity: number
 }
 
-// Erreurs de stock par index de ligne
 type StockErrors = Record<number, string>
 
 interface Props {
@@ -22,6 +21,159 @@ interface Props {
   setInvoice: (invoice: Invoice) => void
 }
 
+// ── Composant SearchableProduct ─────────────────────────────
+interface SearchableProductProps {
+  products: ProductOption[]
+  selectedProductId: string | null
+  onSelect: (productId: string) => void
+  getAvailableStock: (productId: string, index: number) => number
+  index: number
+  hasError: boolean
+}
+
+const SearchableProduct: React.FC<SearchableProductProps> = ({
+  products, selectedProductId, onSelect, getAvailableStock, index, hasError
+}) => {
+  const [query, setQuery] = useState("")
+  const [open, setOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // Nom du produit sélectionné
+  const selectedProduct = products.find((p) => p.id === selectedProductId)
+
+  // Fermer si clic dehors
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery("")
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Filtrer les produits selon la recherche
+  const filtered = query.trim() === ""
+    ? products
+    : products.filter((p) =>
+        p.name.toLowerCase().includes(query.toLowerCase())
+      )
+
+  const handleSelect = (productId: string) => {
+    onSelect(productId)
+    setQuery("")
+    setOpen(false)
+  }
+
+  const handleClear = () => {
+    onSelect("")
+    setQuery("")
+    setOpen(false)
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative min-w-[200px]">
+      {/* Champ de recherche */}
+      <div className={`flex items-center gap-1.5 input input-sm input-bordered w-full rounded-lg px-2 ${
+        hasError ? 'input-error' : focused ? 'input-accent' : ''
+      }`}>
+        <Search className="w-3 h-3 text-gray-400 shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          className="flex-1 bg-transparent outline-none text-sm min-w-0"
+          placeholder={selectedProduct ? selectedProduct.name : "Rechercher un produit..."}
+          value={selectedProduct && !open ? "" : query}
+          onFocus={() => { setFocused(true); setOpen(true) }}
+          onBlur={() => setFocused(false)}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        />
+        {/* Badge produit sélectionné ou bouton effacer */}
+        {selectedProduct && !open ? (
+          <button
+            className="shrink-0 text-gray-400 hover:text-error transition-colors"
+            onMouseDown={(e) => { e.preventDefault(); handleClear() }}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        ) : null}
+      </div>
+
+      {/* Nom produit sélectionné affiché sous le champ */}
+      {selectedProduct && !open && (
+        <p className="text-[10px] text-accent font-semibold mt-0.5 truncate">
+          ✓ {selectedProduct.name}
+        </p>
+      )}
+
+      {/* Dropdown suggestions */}
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-base-300 rounded-xl shadow-lg z-50 max-h-56 overflow-y-auto">
+          {/* Option Manuel */}
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-base-200 transition-colors text-left border-b border-base-200"
+            onMouseDown={(e) => { e.preventDefault(); handleSelect("") }}
+          >
+            <span className="text-base">✏️</span>
+            <span className="text-gray-500">Saisie manuelle</span>
+          </button>
+
+          {filtered.length === 0 ? (
+            <div className="px-3 py-4 text-center text-sm text-gray-400">
+              Aucun produit trouvé pour &quot;{query}&quot;
+            </div>
+          ) : (
+            filtered.map((p) => {
+              const available = getAvailableStock(p.id, index)
+              const isExhausted = available === 0
+              const isSelected = p.id === selectedProductId
+
+              return (
+                <button
+                  key={p.id}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm transition-colors text-left ${
+                    isExhausted
+                      ? 'opacity-40 cursor-not-allowed'
+                      : isSelected
+                      ? 'bg-accent/10 text-accent'
+                      : 'hover:bg-base-200'
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    if (!isExhausted) handleSelect(p.id)
+                  }}
+                  disabled={isExhausted}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{p.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {p.price.toLocaleString('fr-FR')} FCFA/u
+                    </p>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    isExhausted
+                      ? 'bg-error/10 text-error'
+                      : available <= 5
+                      ? 'bg-warning/10 text-warning'
+                      : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {isExhausted ? 'Épuisé' : `${available} dispo`}
+                  </span>
+                </button>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Composant principal InvoiceLines ────────────────────────
 const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
   const { user } = useUser()
   const email = user?.primaryEmailAddress?.emailAddress as string
@@ -35,29 +187,23 @@ const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProducts()
   }, [email])
 
-  // Calcule le stock réellement disponible pour un produit,
-  // en soustrayant les quantités déjà utilisées dans les autres lignes
- const getAvailableStock = (productId: string, currentIndex: number): number => {
-  const product = products.find((p) => p.id === productId)
-  if (!product) return 0
+  const getAvailableStock = (productId: string, currentIndex: number): number => {
+    const product = products.find((p) => p.id === productId)
+    if (!product) return 0
+    const freeStock = product.quantity - product.reservedQuantity
+    const usedInOtherLines = invoice.lines.reduce((total, line, idx) => {
+      if (idx !== currentIndex && line.productId === productId) {
+        return total + (line.quantity ?? 0)
+      }
+      return total
+    }, 0)
+    return Math.max(0, freeStock - usedInOtherLines)
+  }
 
-  // Stock libre = physique - déjà réservé en base
-  const freeStock = product.quantity - product.reservedQuantity
-
-  // Quantité utilisée dans les autres lignes de CETTE facture
-  const usedInOtherLines = invoice.lines.reduce((total, line, idx) => {
-    if (idx !== currentIndex && line.productId === productId) {
-      return total + (line.quantity ?? 0)
-    }
-    return total
-  }, 0)
-
-  return Math.max(0, freeStock - usedInOtherLines)
-}
-  // Valide toutes les lignes et retourne les erreurs
   const validateLines = (lines: typeof invoice.lines) => {
     const errors: StockErrors = {}
     lines.forEach((line, index) => {
@@ -116,8 +262,7 @@ const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
     const updatedLines = [...invoice.lines]
     const qty = value === "" ? 0 : parseInt(value)
     updatedLines[index] = { ...updatedLines[index], quantity: qty }
-    const newInvoice = { ...invoice, lines: updatedLines }
-    setInvoice(newInvoice)
+    setInvoice({ ...invoice, lines: updatedLines })
     setStockErrors(validateLines(updatedLines))
   }
 
@@ -202,32 +347,16 @@ const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
                   <React.Fragment key={line.id}>
                     <tr className={`transition-colors ${hasError ? 'bg-error/5' : 'hover:bg-base-300/30'}`}>
 
-                      {/* Sélecteur produit */}
-                      <td className='min-w-[180px]'>
-                        <select
-                          className={`select select-sm select-bordered w-full rounded-lg focus:select-accent ${hasError ? 'select-error' : ''}`}
-                          value={line.productId ?? ""}
-                          onChange={(e) => handleProductSelect(index, e.target.value)}
-                        >
-                          <option value="">✏️ Manuel</option>
-                          {products.map((p) => {
-                            const availForThis = getAvailableStock(p.id, index)
-                            const isExhausted = availForThis === 0 && p.id !== line.productId
-                            return (
-                              <option
-                                key={p.id}
-                                value={p.id}
-                                disabled={isExhausted}
-                              >
-                                {p.name}{' '}
-                                {availForThis === 0
-                                  ? '(épuisé)'
-                                  : `(${availForThis} dispo)`
-                                }
-                              </option>
-                            )
-                          })}
-                        </select>
+                      {/* Recherche produit */}
+                      <td className='min-w-[220px]'>
+                        <SearchableProduct
+                          products={products}
+                          selectedProductId={line.productId}
+                          onSelect={(productId) => handleProductSelect(index, productId)}
+                          getAvailableStock={getAvailableStock}
+                          index={index}
+                          hasError={hasError}
+                        />
                       </td>
 
                       {/* Quantité */}
@@ -240,13 +369,9 @@ const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
                           max={available ?? undefined}
                           onChange={(e) => handleQuantityChange(index, e.target.value)}
                         />
-                        {/* Stock restant affiché sous le champ */}
                         {product && available !== null && (
                           <p className={`text-[10px] mt-0.5 ${hasError ? 'text-error font-semibold' : 'text-gray-400'}`}>
-                            {hasError
-                              ? `Max : ${available}`
-                              : `Dispo : ${available}`
-                            }
+                            {hasError ? `Max : ${available}` : `Dispo : ${available}`}
                           </p>
                         )}
                       </td>
@@ -297,7 +422,7 @@ const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
                       </td>
                     </tr>
 
-                    {/* Ligne d'erreur stock */}
+                    {/* Ligne erreur stock */}
                     {hasError && (
                       <tr className='bg-error/5'>
                         <td colSpan={6} className='py-1 px-4'>

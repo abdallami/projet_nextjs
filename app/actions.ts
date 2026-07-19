@@ -440,35 +440,46 @@ export async function updateProduct(
   }
 ) {
   try {
-    const oldProduct = await prisma.product.findUnique({ where: { id } });
+    const oldProduct = await prisma.product.findUnique({ where: { id } })
+    if (!oldProduct) return
 
     const updated = await prisma.product.update({
       where: { id },
-      data,
-    });
+      data: {
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        purchasePrice: data.purchasePrice,
+        quantity: data.quantity,
+        alertQty: data.alertQty,
+        categoryId: data.categoryId ?? null,
+      },
+    })
 
-    if (oldProduct && data.quantity > oldProduct.quantity) {
-      const qtyAdded = data.quantity - oldProduct.quantity;
-      const purchasePrice = data.purchasePrice > 0 ? data.purchasePrice : data.price;
-      const montantAchat = qtyAdded * purchasePrice;
+    // Transaction sortie auto si quantité augmentée
+    if (data.quantity > oldProduct.quantity) {
+      const qtyAdded = data.quantity - oldProduct.quantity
+      const prixAchat = data.purchasePrice > 0 ? data.purchasePrice : data.price
+      const montant = qtyAdded * prixAchat
 
       await prisma.transaction.create({
         data: {
           type: 'sortie',
           category: 'Achat stock',
-          description: `Achat ${qtyAdded} × ${data.name} à ${purchasePrice.toLocaleString('fr-FR')} FCFA/u`,
-          amount: montantAchat,
+          description: `Achat ${qtyAdded} × ${data.name} à ${prixAchat.toLocaleString('fr-FR')} FCFA/u`,
+          amount: montant,
           date: new Date().toISOString().split('T')[0],
           userId: oldProduct.userId,
         },
-      });
+      })
     }
 
-    return updated;
+    return updated
   } catch (error) {
-    console.error(error);
+    console.error(error)
   }
 }
+
 
 export async function deleteProduct(id: string) {
   try {
@@ -825,5 +836,30 @@ export async function deleteTransaction(id: string) {
     await prisma.transaction.delete({ where: { id } })
   } catch (error) {
     console.error(error)
+  }
+}
+
+// ── Récupérer transactions par type pour dashboard ──────────
+export async function getTransactionStats(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return { totalEntrees: 0, totalSorties: 0 }
+
+    const transactions = await prisma.transaction.findMany({
+      where: { userId: user.id }
+    })
+
+    const totalEntrees = transactions
+      .filter((t) => t.type === 'entree')
+      .reduce((acc, t) => acc + t.amount, 0)
+
+    const totalSorties = transactions
+      .filter((t) => t.type === 'sortie')
+      .reduce((acc, t) => acc + t.amount, 0)
+
+    return { totalEntrees, totalSorties }
+  } catch (error) {
+    console.error(error)
+    return { totalEntrees: 0, totalSorties: 0 }
   }
 }
