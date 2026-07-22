@@ -133,7 +133,7 @@ export default function DashboardPage() {
               Bonjour {user?.firstName} 👋 — vue d&apos;ensemble de votre activité
             </p>
           </div>
-          <Link href="/report" className="btn btn-sm btn-ghost rounded-xl gap-2 border border-base-300">
+          <Link href="/rapport" className="btn btn-sm btn-ghost rounded-xl gap-2 border border-base-300">
             <BarChart3 className="w-4 h-4 text-accent" />
             <span className="hidden sm:inline">Rapport</span>
           </Link>
