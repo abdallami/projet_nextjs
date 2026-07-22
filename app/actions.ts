@@ -73,8 +73,10 @@ export async function createEmptyInvoice(email:string,name:string){
                 vatActive:false,
                 vatRate:20
 
-            }
+            },
+             include: { lines: true }  // ← ajout
         })
+         return newInvoice  // ← ajout
         }
    
         
@@ -90,7 +92,9 @@ export async function getInvoicesByEmail(email: string) {
             where: { email },
             include: {
                 invoices: {
-                    include: { lines: true }
+                    include: { lines: true },
+                     where: { deletedAt: null },// ← exclure la corbeille
+                    orderBy: { id: 'desc' } 
                 }
             }
         })
@@ -130,7 +134,7 @@ export async function getInvoicesByEmail(email: string) {
 export async function getInvoiceById(invoiceId:string){
     try{
         const invoice = await prisma.invoice.findUnique({
-            where:{id:invoiceId},
+            where:{id:invoiceId, deletedAt: null},
             include:{
                 lines:true
             }
@@ -220,25 +224,88 @@ export async function updateInvoice(invoice: Invoice) {
       }
     }
 
-    // ✅ Décrémenter le stock si la facture passe à "Payé" (status = 3)
-    const wasAlreadyPaid = existingInvoice.status === 3
-    const isNowPaid = invoice.status === 3
+   // ✅ Gestion stock selon changement de statut
+    const oldStatus = existingInvoice.status
+    const newStatus = invoice.status
 
-    if (isNowPaid && !wasAlreadyPaid) {
-      for (const line of receivedLines) {
-        if (line.productId) {
-          const product = await prisma.product.findUnique({
-            where: { id: line.productId }
-          })
-          if (product) {
-            const newQty = product.quantity - line.quantity
-            await prisma.product.update({
-              where: { id: line.productId },
-              data: { quantity: newQty < 0 ? 0 : newQty }
-            })
-          }
-        }
+    if (oldStatus !== newStatus) {
+      // Brouillon → En attente : réserver
+      if (oldStatus === 1 && newStatus === 2) {
+        await reserveStock(invoice.id)
       }
+
+     // En attente → Payée : confirmer (déduit physique + libère réservation)
+else if (oldStatus === 2 && newStatus === 3) {
+  await confirmStockOnPayment(invoice.id)
+  // Créer transaction entrée automatique
+  const user = await prisma.user.findUnique({
+    where: { id: existingInvoice.userId }
+  })
+  if (user) {
+    const totalHT = receivedLines.reduce(
+      (acc, l) => acc + l.quantity * l.unitPrice, 0
+    )
+    const totalTTC = invoice.vatActive
+      ? totalHT * (1 + (invoice.vatRate ?? 0) / 100)
+      : totalHT
+    await prisma.transaction.create({
+      data: {
+        type: 'entree',
+        category: 'Facture payée',
+        description: `Facture : ${invoice.name}${invoice.clientName ? ` — ${invoice.clientName}` : ''}`,
+        amount: totalTTC,
+        date: new Date().toISOString().split('T')[0],
+        userId: user.id,
+      }
+    })
+  }
+}
+
+// Brouillon → Payée directement
+else if (oldStatus === 1 && newStatus === 3) {
+  await confirmStockOnPayment(invoice.id)
+  // Créer transaction entrée automatique
+  const user = await prisma.user.findUnique({
+    where: { id: existingInvoice.userId }
+  })
+  if (user) {
+    const totalHT = receivedLines.reduce(
+      (acc, l) => acc + l.quantity * l.unitPrice, 0
+    )
+    const totalTTC = invoice.vatActive
+      ? totalHT * (1 + (invoice.vatRate ?? 0) / 100)
+      : totalHT
+    await prisma.transaction.create({
+      data: {
+        type: 'entree',
+        category: 'Facture payée',
+        description: `Facture : ${invoice.name}${invoice.clientName ? ` — ${invoice.clientName}` : ''}`,
+        amount: totalTTC,
+        date: new Date().toISOString().split('T')[0],
+        userId: user.id,
+      }
+    })
+  }
+}
+
+     // Annulée : libérer réservation OU restituer stock selon statut précédent
+  else if (newStatus === 4) {
+    if (oldStatus === 2) {
+      await releaseStock(invoice.id)
+    } else if (oldStatus === 3) {
+      for (const line of receivedLines) {
+        if (!line.productId) continue
+        const product = await prisma.product.findUnique({ where: { id: line.productId } })
+        if (!product) continue
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: { quantity: product.quantity + line.quantity }
+        })
+      }
+    }
+  }
+
+      // Impayée (status 5 auto) : garder la réservation
     }
 
   } catch (error) {
@@ -247,16 +314,7 @@ export async function updateInvoice(invoice: Invoice) {
 }
 //pour supprimer
 export async function deleteInvoice(invoiceId:string){
- try{
-   const deleteInvoice =await prisma.invoice.delete({
-        where:{id:invoiceId}
-    })
-  if(!deleteInvoice){
-    throw new Error("Erreur lors de la suppression de la facture")
-  }
- }catch(error){
-   console.error(error)
- }
+  return softDeleteInvoice(invoiceId)
 }
 
 // pour les categorie et produits 
@@ -348,16 +406,21 @@ export async function createProduct(
     name: string;
     description: string;
     price: number;
+    purchasePrice: number;
     quantity: number;
     alertQty: number;
-    categoryId?: string;
+    categoryId?: string | null;
   }
 ) {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error("Utilisateur introuvable");
+
     return await prisma.product.create({
-      data: { ...data, userId: user.id },
+      data: {
+        ...data,
+        userId: user.id,
+      },
     });
   } catch (error) {
     console.error(error);
@@ -370,20 +433,53 @@ export async function updateProduct(
     name: string;
     description: string;
     price: number;
+    purchasePrice: number;
     quantity: number;
     alertQty: number;
     categoryId?: string | null;
   }
 ) {
   try {
-    return await prisma.product.update({
+    const oldProduct = await prisma.product.findUnique({ where: { id } })
+    if (!oldProduct) return
+
+    const updated = await prisma.product.update({
       where: { id },
-      data,
-    });
+      data: {
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        purchasePrice: data.purchasePrice,
+        quantity: data.quantity,
+        alertQty: data.alertQty,
+        categoryId: data.categoryId ?? null,
+      },
+    })
+
+    // Transaction sortie auto si quantité augmentée
+    if (data.quantity > oldProduct.quantity) {
+      const qtyAdded = data.quantity - oldProduct.quantity
+      const prixAchat = data.purchasePrice > 0 ? data.purchasePrice : data.price
+      const montant = qtyAdded * prixAchat
+
+      await prisma.transaction.create({
+        data: {
+          type: 'sortie',
+          category: 'Achat stock',
+          description: `Achat ${qtyAdded} × ${data.name} à ${prixAchat.toLocaleString('fr-FR')} FCFA/u`,
+          amount: montant,
+          date: new Date().toISOString().split('T')[0],
+          userId: oldProduct.userId,
+        },
+      })
+    }
+
+    return updated
   } catch (error) {
-    console.error(error);
+    console.error(error)
   }
 }
+
 
 export async function deleteProduct(id: string) {
   try {
@@ -473,5 +569,297 @@ export async function getProductSalesStats(email: string) {
   } catch (error) {
     console.error(error)
     return []
+  }
+}
+
+// Vérifie si la quantité demandée est disponible en stock
+export async function checkStockAvailability(
+  productId: string,
+  requestedQty: number
+): Promise<{ available: boolean; stock: number; productName: string }> {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: productId } })
+    if (!product) return { available: false, stock: 0, productName: "" }
+    return {
+      available: product.quantity >= requestedQty,
+      stock: product.quantity,
+      productName: product.name,
+    }
+  } catch (error) {
+    console.error(error)
+    return { available: false, stock: 0, productName: "" }
+  }
+}
+
+// ── Réserver du stock (facture En attente) ──────────────────
+export async function reserveStock(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: { include: { product: true } } }
+    })
+    if (!invoice) return
+
+    await Promise.all(
+      invoice.lines.map(async (line) => {
+        if (!line.productId) return
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: {
+            reservedQuantity: {
+              increment: line.quantity
+            }
+          }
+        })
+      })
+    )
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Libérer la réservation (facture Annulée / Brouillon) ────
+export async function releaseStock(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: { include: { product: true } } }
+    })
+    if (!invoice) return
+
+    await Promise.all(
+      invoice.lines.map(async (line) => {
+        if (!line.productId) return
+        const product = await prisma.product.findUnique({
+          where: { id: line.productId }
+        })
+        if (!product) return
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: {
+            reservedQuantity: Math.max(0, product.reservedQuantity - line.quantity)
+          }
+        })
+      })
+    )
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Confirmer le paiement (facture Payée) ───────────────────
+export async function confirmStockOnPayment(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: { include: { product: true } } }
+    })
+    if (!invoice) return
+
+    await Promise.all(
+      invoice.lines.map(async (line) => {
+        if (!line.productId) return
+        const product = await prisma.product.findUnique({
+          where: { id: line.productId }
+        })
+        if (!product) return
+        await prisma.product.update({
+          where: { id: line.productId },
+          data: {
+            // Déduit du stock physique ET libère la réservation
+            quantity: Math.max(0, product.quantity - line.quantity),
+            reservedQuantity: Math.max(0, product.reservedQuantity - line.quantity)
+          }
+        })
+      })
+    )
+  } catch (error) {
+    console.error(error)
+  }
+}
+// Import produits depuis Excel
+export async function importProductsFromExcel(
+  email: string,
+  products: {
+    name: string
+    description: string
+    price: number
+    quantity: number
+    alertQty: number
+  }[]
+) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) throw new Error("Utilisateur introuvable")
+
+    const created = await Promise.all(
+      products.map((p) =>
+        prisma.product.create({
+          data: {
+            name: p.name || "Sans nom",
+            description: p.description || "",
+            price: isNaN(p.price) ? 0 : p.price,
+            quantity: isNaN(p.quantity) ? 0 : p.quantity,
+            alertQty: isNaN(p.alertQty) ? 5 : p.alertQty,
+            reservedQuantity: 0,
+            userId: user.id,
+          },
+        })
+      )
+    )
+    return { success: true, count: created.length }
+  } catch (error) {
+    console.error(error)
+    return { success: false, count: 0 }
+  }
+}
+
+// ── Envoyer en corbeille (soft delete) ─────────────────────
+export async function softDeleteInvoice(invoiceId: string) {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { lines: true }
+    })
+    if (!invoice) return
+
+    // Libérer la réservation si En attente ou Impayée
+    if (invoice.status === 2 || invoice.status === 5) {
+      await releaseStock(invoiceId)
+    }
+
+    await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { deletedAt: new Date() }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Restaurer depuis la corbeille ───────────────────────────
+export async function restoreInvoice(invoiceId: string) {
+  try {
+    await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { deletedAt: null }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Supprimer définitivement ────────────────────────────────
+export async function permanentDeleteInvoice(invoiceId: string) {
+  try {
+    await prisma.invoice.delete({
+      where: { id: invoiceId }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Récupérer les factures en corbeille ─────────────────────
+export async function getTrashedInvoices(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return []
+
+    // Nettoyer automatiquement les factures de plus de 30 jours
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    await prisma.invoice.deleteMany({
+      where: {
+        userId: user.id,
+        deletedAt: { not: null, lte: thirtyDaysAgo }
+      }
+    })
+
+    // Retourner les factures restantes dans la corbeille
+    return await prisma.invoice.findMany({
+      where: {
+        userId: user.id,
+        deletedAt: { not: null }
+      },
+      include: { lines: true },
+      orderBy: { deletedAt: 'desc' }
+    })
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+
+// ── Créer une transaction (entrée ou sortie) ────────────────
+export async function createTransaction(
+  email: string,
+  data: {
+    type: string        // "entree" ou "sortie"
+    category: string
+    description: string
+    amount: number
+    date: string
+  }
+) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return
+    return await prisma.transaction.create({
+      data: { ...data, userId: user.id }
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Récupérer toutes les transactions ───────────────────────
+export async function getTransactions(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return []
+    return await prisma.transaction.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' }
+    })
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+// ── Supprimer une transaction ────────────────────────────────
+export async function deleteTransaction(id: string) {
+  try {
+    await prisma.transaction.delete({ where: { id } })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// ── Récupérer transactions par type pour dashboard ──────────
+export async function getTransactionStats(email: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) return { totalEntrees: 0, totalSorties: 0 }
+
+    const transactions = await prisma.transaction.findMany({
+      where: { userId: user.id }
+    })
+
+    const totalEntrees = transactions
+      .filter((t) => t.type === 'entree')
+      .reduce((acc, t) => acc + t.amount, 0)
+
+    const totalSorties = transactions
+      .filter((t) => t.type === 'sortie')
+      .reduce((acc, t) => acc + t.amount, 0)
+
+    return { totalEntrees, totalSorties }
+  } catch (error) {
+    console.error(error)
+    return { totalEntrees: 0, totalSorties: 0 }
   }
 }

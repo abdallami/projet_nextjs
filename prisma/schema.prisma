@@ -51,6 +51,7 @@ model User {
   invoices   Invoice[]  @relation("UserInvoices")
   products   Product[]  @relation("UserProducts")
   categories Category[] @relation("UserCategories")
+  transactions Transaction[] @relation("UserTransactions")
 }
 
 model Category {
@@ -68,7 +69,9 @@ model Product {
   name         String
   description  String        @default("")
   price        Float         @default(0)
+  purchasePrice    Float         @default(0)   //(prix d'achat)
   quantity     Int           @default(0)
+  reservedQuantity Int       @default(0)   // ← ajouter cette ligne
   alertQty     Int           @default(5)   // alerte stock faible
   categoryId   String?
   category     Category?     @relation("CategoryProducts", fields: [categoryId], references: [id])
@@ -91,6 +94,7 @@ model Invoice {
   vatActive     Boolean       @default(false)
   vatRate       Float         @default(20)
   status        Int           @default(1)
+  deletedAt     DateTime?
   lines         InvoiceLine[] @relation("InvoiceLines")
   userId        String
   createdById   User          @relation("UserInvoices", fields: [userId], references: [id])
@@ -105,4 +109,15 @@ model InvoiceLine {
   invoice     Invoice? @relation("InvoiceLines", fields: [invoiceId], references: [id], onDelete: Cascade)
   productId   String?
   product     Product? @relation("ProductLines", fields: [productId], references: [id])
+}
+model Transaction {
+  id          String   @id @default(uuid())
+  type        String   // "entree" ou "sortie"
+  category    String   @default("") // "facture", "achat_stock", "loyer", "transport", etc.
+  description String   @default("")
+  amount      Float    @default(0)
+  date        String   @default("")
+  userId      String
+  createdBy   User     @relation("UserTransactions", fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
 }

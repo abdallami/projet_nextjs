@@ -4,7 +4,8 @@ import { Layers2, Plus, Trash2, Search, Filter } from "lucide-react";
 import Wrapper from "../components/Wrapper";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { createEmptyInvoice, getInvoicesByEmail, deleteInvoice } from "../actions";
+import Link from "next/link";
+import { createEmptyInvoice, getInvoicesByEmail, softDeleteInvoice } from "../actions";
 import confetti from "canvas-confetti";
 import { Invoice } from "@/type";
 import InvoiceComponents from "../components/InvoiceComponents";
@@ -54,8 +55,15 @@ export default function Home() {
   // Création facture
   const handleCreateInvoice = async () => {
     try {
-      if (email) await createEmptyInvoice(email, invoiceName)
-      fetchInvoices()
+      if (email) {
+        const newInvoice = await createEmptyInvoice(email, invoiceName)
+        // Ajoute immédiatement en tête sans attendre fetchInvoices
+        if (newInvoice) {
+          setInvoices((prev) => [newInvoice, ...prev])
+        } else {
+          fetchInvoices()
+        }
+      }
       setInvoiceName("")
       ;(document.getElementById('my_modal_3') as HTMLDialogElement).close()
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, zIndex: 9999 })
@@ -65,7 +73,14 @@ export default function Home() {
   }
 
   // Filtrage
-  const filtered = invoices.filter((inv) => {
+  // Tri : plus récentes en premier (sécurité côté client)
+  const sorted = [...invoices].sort((a, b) => {
+    const da = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const db = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return db - da
+  })
+
+  const filtered = sorted.filter((inv) => {
     const matchSearch = inv.name.toLowerCase().includes(search.toLowerCase()) ||
       inv.clientName?.toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusFilter === "" || inv.status === parseInt(statusFilter)
@@ -92,7 +107,7 @@ export default function Home() {
     if (!confirm(`Supprimer ${selected.length} facture(s) ?`)) return
     setIsDeleting(true)
     try {
-      await Promise.all(selected.map((id) => deleteInvoice(id)))
+      await Promise.all(selected.map((id) => softDeleteInvoice(id)))
       setSelected([])
       fetchInvoices()
     } catch (error) {
@@ -114,13 +129,22 @@ export default function Home() {
               {invoices.length} facture{invoices.length > 1 ? 's' : ''} au total
             </p>
           </div>
-          <button
-            className="btn btn-accent rounded-lg gap-2"
-            onClick={() => (document.getElementById('my_modal_3') as HTMLDialogElement).showModal()}
-          >
-            <Plus className="w-4 h-4" />
-            Nouvelle facture
-          </button>
+          <div className="flex gap-2">
+            <Link
+              href="/invoices/trash"
+              className="btn btn-sm btn-ghost rounded-lg gap-2 border border-base-300"
+            >
+              <Trash2 className="w-4 h-4 text-error" />
+              <span className="hidden sm:inline">Corbeille</span>
+            </Link>
+            <button
+              className="btn btn-accent rounded-lg gap-2"
+              onClick={() => (document.getElementById('my_modal_3') as HTMLDialogElement).showModal()}
+            >
+              <Plus className="w-4 h-4" />
+              Nouvelle facture
+            </button>
+          </div>
         </div>
 
         {/* Barre de recherche + filtres */}
@@ -155,19 +179,19 @@ export default function Home() {
 
         {/* Barre d'actions sélection */}
         {selected.length > 0 && (
-          <div className="flex items-center justify-between bg-error/10 border border-error/20 rounded-xl px-4 py-3">
-            <span className="text-sm font-medium text-error">
+          <div className="flex flex-col gap-3 rounded-xl border border-error/20 bg-error/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-error break-words">
               {selected.length} facture{selected.length > 1 ? 's' : ''} sélectionnée{selected.length > 1 ? 's' : ''}
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
               <button
-                className="btn btn-sm btn-ghost"
+                className="btn btn-sm btn-ghost w-full sm:w-auto"
                 onClick={() => setSelected([])}
               >
                 Annuler
               </button>
               <button
-                className="btn btn-sm btn-error gap-1.5"
+                className="btn btn-sm btn-error gap-1.5 w-full sm:w-auto"
                 onClick={handleDeleteSelected}
                 disabled={isDeleting}
               >
@@ -175,7 +199,7 @@ export default function Home() {
                   ? <span className="loading loading-spinner loading-xs" />
                   : <Trash2 className="w-3.5 h-3.5" />
                 }
-                Supprimer
+                Déplacer vers la corbeille
               </button>
             </div>
           </div>
