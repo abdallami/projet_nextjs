@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import Wrapper from "../components/Wrapper"
 import {
   getInvoicesByEmail, getProductSalesStats,
-  getProducts, getLowStockProducts, getTransactionStats, getTransactions
+  getProducts, getLowStockProducts, getTransactions
 } from "../actions"
 import {
   AlertTriangle, TrendingUp, FileText, Package,
