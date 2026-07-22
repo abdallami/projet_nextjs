@@ -549,7 +549,7 @@ export default function LandingPage() {
               <span className="font-black text-lg italic text-white tracking-tight">In<span className="text-emerald-400">voice</span> Pro</span>
             </div>
             <div className="flex items-center gap-1 text-xs text-gray-500">
-              <Globe className="w-3 h-3" /> Conçu avec ❤️ pour l&apos;Afrique centrale
+              <Globe className="w-3 h-3" /> Conçu avec ❤️ pour l&apos;Afrique 
             </div>
             <p className="text-xs text-gray-600">© {new Date().getFullYear()} Invoice Pro. Tous droits réservés.</p>
           </div>
