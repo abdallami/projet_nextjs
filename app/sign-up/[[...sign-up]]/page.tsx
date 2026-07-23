@@ -1,29 +1,99 @@
 // @ts-nocheck
 import { SignUp } from '@clerk/nextjs'
-import { Layers2, FileText, Package, BarChart3, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
+import { FileText, Package, Wallet, CheckCircle2, ArrowLeft, Star } from 'lucide-react'
+
+const AfricaLogo = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M38 4 C28 4 18 10 14 20 C10 30 12 40 10 50 C8 58 4 64 6 72 C8 82 16 88 22 96 C28 104 32 114 42 116 C50 118 56 110 62 104 C70 96 80 92 86 84 C92 76 90 64 88 54 C86 44 82 36 80 26 C78 16 72 8 62 5 C54 3 46 4 38 4Z" fill="currentColor" opacity="0.9"/>
+    <ellipse cx="88" cy="78" rx="5" ry="9" fill="currentColor" opacity="0.5" transform="rotate(15 88 78)" />
+  </svg>
+)
+
+const InvoiceMini = () => (
+  <div className="relative">
+    <div className="absolute inset-0 bg-emerald-300 rounded-2xl transform translate-x-2 translate-y-2 blur-sm opacity-30" />
+    <div className="relative bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden text-gray-800">
+      <div className="bg-emerald-500 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <div className="bg-white/20 rounded-lg p-1"><AfricaLogo size={14} /></div>
+          <span className="text-white font-black text-xs italic">In<span className="text-emerald-200">voice</span> Pro</span>
+        </div>
+        <span className="text-emerald-100 text-[10px] font-bold bg-white/15 px-1.5 py-0.5 rounded-md">EN ATTENTE</span>
+      </div>
+      <div className="px-4 py-3 space-y-3">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-base font-black text-gray-900 tracking-tight">FACTURE</p>
+            <p className="text-[9px] text-gray-400 font-mono">#C9D1E4F2</p>
+          </div>
+          <div className="text-right"><p className="text-[9px] text-gray-400">22 Jul. 2026</p></div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-gray-50 rounded-lg p-2">
+            <p className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">Émetteur</p>
+            <p className="text-[10px] font-bold text-gray-800">Ali Commerce</p>
+            <p className="text-[9px] text-gray-500">Abéché</p>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-2">
+            <p className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">Client</p>
+            <p className="text-[10px] font-bold text-gray-800">BRAC Tchad</p>
+            <p className="text-[9px] text-gray-500">N'Djamena</p>
+          </div>
+        </div>
+        <div className="rounded-lg overflow-hidden border border-gray-100">
+          <div className="bg-gray-800 text-white grid grid-cols-3 px-2 py-1 text-[8px] font-semibold">
+            <span>Produit</span><span className="text-center">Qté</span><span className="text-right">Total</span>
+          </div>
+          {[
+            { n: "Sac de riz 50kg", q: 30, t: "750 000" },
+            { n: "Huile végétale 5L", q: 50, t: "200 000" },
+            { n: "Sucre cristal 25kg", q: 20, t: "140 000" },
+          ].map((l, i) => (
+            <div key={l.n} className={`grid grid-cols-3 px-2 py-1.5 text-[9px] ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+              <span className="text-gray-700 truncate">{l.n}</span>
+              <span className="text-center text-gray-500">{l.q}</span>
+              <span className="text-right font-bold text-gray-800">{l.t}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+          <span className="text-xs font-bold text-gray-700">Total TTC</span>
+          <span className="bg-amber-500 text-white text-xs font-black px-2.5 py-1 rounded-lg">1 090 000 FCFA</span>
+        </div>
+      </div>
+    </div>
+    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-lg flex items-center gap-1">
+      <FileText className="w-2.5 h-2.5" />PDF
+    </div>
+  </div>
+)
+
+const features = [
+  { icon: FileText, color: "bg-emerald-100 text-emerald-600", title: "Facturation PDF", desc: "Factures pro en FCFA, exportées en PDF en 1 clic" },
+  { icon: Package, color: "bg-blue-100 text-blue-600", title: "Stock intelligent", desc: "Réservation auto, alertes, import/export Excel" },
+  { icon: Wallet, color: "bg-purple-100 text-purple-600", title: "Trésorerie & Rapports", desc: "Entrées/sorties auto + rapports financiers PDF" },
+]
 
 const perks = [
-  'Gratuit pour toujours sur le plan Starter',
-  'Aucune carte bancaire requise',
-  'Opérationnel en moins de 2 minutes',
-  'Données sécurisées et sauvegardées',
+  "Gratuit pour toujours sur le plan Starter",
+  "Aucune carte bancaire requise",
+  "Opérationnel en moins de 2 minutes",
 ]
 
 export default function SignUpPage() {
   return (
-    <div className="min-h-screen flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen flex flex-col lg:flex-row font-sans bg-gray-50">
 
-      {/* ── Panneau gauche — Branding ─────────────────────────── */}
-      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-emerald-600 to-emerald-800 flex-col justify-between p-10 relative overflow-hidden">
-
-        <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/5 rounded-full translate-y-1/3 -translate-x-1/4" />
+      {/* ── Panneau gauche — Branding (desktop only) ──────────── */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-600 to-emerald-800 flex-col justify-between p-10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-1/3 -translate-x-1/4" />
 
         {/* Logo */}
-        <Link href="/" className="relative flex items-center gap-2.5 w-fit">
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
-            <Layers2 className="w-5 h-5 text-white" />
+        <Link href="/" className="relative flex items-center gap-2.5 w-fit group">
+          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2 group-hover:bg-white/30 transition-colors">
+            <AfricaLogo size={20} />
           </div>
           <span className="font-black text-xl italic tracking-tight text-white">
             In<span className="text-emerald-200">voice</span>
@@ -31,53 +101,64 @@ export default function SignUpPage() {
           </span>
         </Link>
 
-        {/* Contenu central */}
-        <div className="relative">
-          <div className="inline-flex items-center gap-2 bg-white/15 text-emerald-100 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
-            ✨ Inscription gratuite
-          </div>
-          <h2 className="text-3xl font-black text-white leading-tight mb-3">
-            Commencez à gérer<br />
-            <span className="text-emerald-200">votre commerce aujourd&apos;hui.</span>
-          </h2>
-          <p className="text-emerald-100 text-sm mb-8 leading-relaxed">
-            Créez votre compte en 30 secondes et commencez à facturer, gérer votre stock et suivre vos finances.
-          </p>
-
-          <ul className="space-y-3">
-            {perks.map((perk) => (
-              <li key={perk} className="flex items-center gap-3">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
-                <span className="text-sm text-emerald-50">{perk}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Stat cards */}
-        <div className="relative grid grid-cols-2 gap-3">
-          {[
-            { value: '2 min', label: "Temps d'installation" },
-            { value: 'FCFA', label: 'Devise native' },
-            { value: '100%', label: 'Cloud sécurisé' },
-            { value: '0 papier', label: 'Zéro document perdu' },
-          ].map(({ value, label }) => (
-            <div key={label} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20 text-center">
-              <p className="text-lg font-black text-white">{value}</p>
-              <p className="text-[11px] text-emerald-200">{label}</p>
+        {/* Contenu */}
+        <div className="relative space-y-8">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-white/15 text-emerald-100 text-xs font-semibold px-3 py-1.5 rounded-full mb-4  mt-1.5">
+              ✨ Inscription gratuite — 0 FCFA
             </div>
-          ))}
+            <h2 className="text-3xl font-black text-white leading-tight mb-3">
+              Commencez à gérer<br />
+              <span className="text-emerald-200">votre commerce aujourd&apos;hui.</span>
+            </h2>
+            <p className="text-emerald-100 text-sm leading-relaxed">
+              Créez votre compte en 30 secondes et commencez à facturer, gérer votre stock et suivre vos finances.
+            </p>
+          </div>
+
+          {/* Perks */}
+          <div className="space-y-2">
+            {perks.map((p) => (
+              <div key={p} className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
+                <span className="text-sm text-emerald-50">{p}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Mockup facture */}
+          <InvoiceMini />
+
+          {/* 3 fonctionnalités */}
+          <div className="space-y-3">
+            {features.map(({ icon: Icon, color, title, desc }) => (
+              <div key={title} className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/10">
+                <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center shrink-0`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">{title}</p>
+                  <p className="text-xs text-emerald-200">{desc}</p>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-300 ml-auto shrink-0" />
+              </div>
+            ))}
+          </div>
         </div>
+
+        <p className="relative text-xs text-emerald-400">
+          © {new Date().getFullYear()} Invoice Pro · Conçu pour l&apos;Afrique 
+        </p>
       </div>
 
       {/* ── Panneau droit — Formulaire ────────────────────────── */}
-      <div className="flex-1 flex flex-col bg-gray-50 min-h-screen md:min-h-0">
+      <div className="flex-1 flex flex-col min-h-screen lg:min-h-0">
 
-        {/* Header mobile only */}
-        <div className="md:hidden flex items-center justify-between px-6 py-5 bg-white border-b border-gray-100">
+        {/* Header mobile */}
+        <div className="lg:hidden flex items-center justify-between px-5 py-4 bg-white border-b border-gray-100">
           <Link href="/" className="flex items-center gap-2">
-            <div className="bg-emerald-100 text-emerald-600 rounded-xl p-1.5">
-              <Layers2 className="w-4 h-4" />
+            <div className="bg-emerald-500 rounded-xl p-1.5">
+              <AfricaLogo size={16} />
             </div>
             <span className="font-black text-lg italic tracking-tight">
               In<span className="text-emerald-500">voice</span>
@@ -89,8 +170,8 @@ export default function SignUpPage() {
           </Link>
         </div>
 
-        {/* Formulaire centré */}
-        <div className="flex-1 flex items-center justify-center p-6 md:p-10">
+        {/* Formulaire */}
+        <div className="flex-1 flex items-center justify-center p-6 lg:p-10">
           <div className="w-full max-w-sm">
 
             <div className="mb-6 text-center">
@@ -105,10 +186,7 @@ export default function SignUpPage() {
 
             <SignUp
               appearance={{
-                layout: {
-                  showOptionalFields: false,
-                  socialButtonsVariant: 'iconButton',
-                },
+                layout: { showOptionalFields: false, socialButtonsVariant: 'iconButton' },
                 variables: {
                   colorPrimary: '#10b981',
                   colorBackground: '#ffffff',
@@ -125,33 +203,33 @@ export default function SignUpPage() {
                   card: 'shadow-none border border-gray-200 rounded-2xl bg-white p-6 w-full',
                   headerTitle: 'hidden',
                   headerSubtitle: 'hidden',
-                  socialButtonsBlockButton: 'border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all rounded-xl h-10 text-sm font-medium text-gray-700',
-                  socialButtonsBlockButtonText: 'text-sm font-medium',
+                  socialButtonsBlockButton: 'border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all rounded-xl h-11 text-sm font-medium text-gray-700',
                   dividerLine: 'bg-gray-200',
                   dividerText: 'text-gray-400 text-xs',
                   formFieldLabel: 'text-sm font-medium text-gray-700',
-                  formFieldInput: 'border border-gray-200 rounded-xl h-10 px-3 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-gray-50 transition-all w-full',
-                  formButtonPrimary: 'bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl h-10 text-sm transition-colors shadow-sm w-full',
+                  formFieldInput: 'border border-gray-200 rounded-xl h-11 px-3 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-gray-50 transition-all w-full',
+                  formButtonPrimary: 'bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl h-11 text-sm transition-colors shadow-sm w-full',
                   footerActionLink: 'text-emerald-600 hover:text-emerald-700 font-semibold',
-                  identityPreviewText: 'text-sm text-gray-700',
-                  identityPreviewEditButton: 'text-emerald-600 hover:text-emerald-700',
                   formFieldInputShowPasswordButton: 'text-gray-400 hover:text-gray-600',
-                  alertText: 'text-sm',
                   formResendCodeLink: 'text-emerald-600 hover:text-emerald-700 font-semibold',
                 },
               }}
             />
+
+            <div className="mt-5 text-center">
+              <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                <ArrowLeft className="w-3 h-3" />
+                Retour à l&apos;accueil
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 text-center">
-          <p className="text-xs text-gray-400">
-            © {new Date().getFullYear()} Invoice Pro · Conçu pour l&apos;Afrique centrale
-          </p>
+        {/* Footer mobile */}
+        <div className="lg:hidden px-5 py-4 text-center border-t border-gray-100">
+          <p className="text-xs text-gray-400">© {new Date().getFullYear()} Invoice Pro · Conçu pour l&apos;Afrique</p>
         </div>
       </div>
-
     </div>
   )
 }
